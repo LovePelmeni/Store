@@ -1,15 +1,13 @@
-apiVersion: apps/v1 
-kind: Deployment 
+apiVersion: v1 
+kind: Service 
 
 metadata: 
   name: store-nginx-server 
-  namespace: store_namespace 
-  labels:
-    type: local 
+  namespace: ingress_namespace  # Ingress Namespace.
 
 spec:
-
   selector:
+
     matchLabels:
       app: store-nginx-server 
 
@@ -23,10 +21,13 @@ spec:
             path: ./nginx/nginx.conf 
 
       containers:
-        - name: nginx-server 
+        - name: store-nginx-server 
           image: nginx:latest 
           ports:
-            - containerPort: 80 
+            - targetPort: 80 
+              port: 8000 
+              protocol: TCP 
+
           volumeMounts:
             - mountPath: /etc/nginx/nginx.conf 
               name: NginxConfiguration 
@@ -36,12 +37,6 @@ spec:
               memory: "1Gi"
             limits:
               memory: "1Gi" 
-
-          livenessProbe:
-            httpGet:
-              - path: /healtcheck/
-                port: 80 
-                protocol: HTTP
           
           dnsPolicy: Default 
           hostNetwork: true 

@@ -2,13 +2,19 @@ apiVersion: networking.k8s.io/v1beta1
 kind: Ingress 
 metadata:
   name: ingress-store-network 
+  namespace: ingress-namespace 
 spec:
+  ingressClassName: nginx 
+  tls:
+    - hosts:
+      - store.com
+    secretName: IngressTLSSecret
   rules:
     host: store.com
     http:
       paths:
-        path: 
-        - backend: 
-            serviceName: store-application-server
-            servicePort: 8080  
+        path: "/"
+        backend: 
+          serviceName: store-nginx-server 
+          servicePort: 8000
     

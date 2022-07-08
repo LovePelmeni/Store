@@ -10,12 +10,14 @@ metadata:
 
 spec:
   selector:
+
     matchLabels:
       app: store-app-kafka-server   
+
   template:
     app: store-app-kafka-server 
-    spec:
 
+    spec:
       replicas: 1 
       containers:
         - name: kafka_server 
@@ -25,6 +27,7 @@ spec:
               - name: kafka-secret-store 
           ports:
             - containerPort: 29092 
+
           resources:
             limits:
               cpu: "0.5"
@@ -37,19 +40,14 @@ spec:
             dnsPolicy: Default 
             restartPolicy: onFailure 
         
-        - name: kafka_event_store 
-          image: confluentinc/
+        - name: kafka-event-store 
+          image: confluentinc/cp-zookeeper:latest 
           ports:
             - containerPort: 21181 
-
           envFrom:
             secretRef:
-              - name: kafka-secret-store 
-
-          hostNetwork: true 
-          dnsPolicy: Default 
-          restartPolicy: onFailure 
-
+              - name: kafka-secret-store
+              
           resources:
             limits:
               memory: "2Gi"
@@ -57,3 +55,7 @@ spec:
             requests:
               memory: "2Gi"
               cpu: "0.5"
+
+        hostNetwork: true 
+        dnsPolicy: Default 
+        restartPolicy: onFailure 

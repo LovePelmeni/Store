@@ -39,11 +39,4 @@ spec:
               port: 8005 
               startPeriod: 30s 
               initialSeconds: 10
-          
-        - name: email_application 
-          image: some_image:latest 
-          envFrom:
-            configMap:
-              - name: ConfigMapView 
-                
-
+      
