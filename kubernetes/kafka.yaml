@@ -1,0 +1,55 @@
+apiVersion: apps/v1 
+kind: Deployment 
+
+metadata:
+  app: store-app-kafka-server 
+  labels:
+    app: store-app-kafka-server 
+    type: local 
+
+spec:
+  selector:
+    matchLabels:
+      app: store-app-kafka-server   
+  template:
+    app: store-app-kafka-server 
+    spec:
+
+      replicas: 1 
+      containers:
+        - name: kafka_server 
+          image: confluentinc/cp-kafka:latest 
+          envFrom:
+            secretRef:
+              - name: kafka-secret-store 
+          ports:
+            - containerPort: 29092 
+          resources:
+            limits:
+              cpu: "0.5"
+              memory: "2Gi"
+            requests:
+              cpu: "0.5"
+              memory: "2Gi"
+            
+            hostNetwork: true 
+            dnsPolicy: Default 
+        
+        - name: kafka_event_store 
+          image: confluentinc/
+          ports:
+            - containerPort: 21181 
+
+          envFrom:
+            secretRef:
+              - name: kafka-secret-store 
+          hostNetwork: true 
+          dnsPolicy: Default 
+
+          resources:
+            limits:
+              memory: "2Gi"
+              cpu: "0.5"
+            requests:
+              memory: "2Gi"
+              cpu: "0.5"

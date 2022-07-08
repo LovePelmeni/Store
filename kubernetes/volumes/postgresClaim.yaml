@@ -1,0 +1,12 @@
+apiVersion: apps/v1 
+kind: persistentClaim 
+metadata:
+  name: persistent-postgres-claim 
+
+spec:
+  StorageClassName: manual 
+  accessModes:
+    - ReadWriteOnce  
+  resources:
+    requests:
+      storage: 3Gi 

@@ -1,0 +1,38 @@
+apiVersion: apps/v1 
+kind: Deployment 
+metadata:
+  app: store-postgresql-database 
+
+spec:
+  selector:
+    matchLabels:
+      app: store-postgresql-database 
+  template:
+    app: store-postgresql-database 
+    spec:
+      containers:
+        - name: postgresql_database 
+          image: postgres:latest 
+          env:
+            - name: POSTGRES_DB 
+              value: application_db 
+
+            - name: POSTGRES_USER 
+              value: postgres_user 
+
+            - name: POSTGRES_PASSWORD
+              value: postgres_password 
+          ports:
+            - containerPort: 5435 
+
+          dnsPolicy: Default 
+          hostNetwork: true  
+
+          volumeMounts:
+            - mountPath: PostgresDataVolume 
+              path: var/lib/postgresql/data 
+
+        volumes:
+          name: PostgresDataVolume
+          persistentVolumeClaim:
+            claimName: persistent-postgres-claim

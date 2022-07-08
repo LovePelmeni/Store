@@ -1,0 +1,31 @@
+apiVersion: apps/v1 
+kind: Deployment 
+metadata:
+  app: store-application-service 
+  labels: 
+    app: store-application-service 
+
+spec:
+  selector:
+    matchLabels:  
+      app: store-application-service 
+  template:
+    app: store-application-service 
+    spec:
+      containers:
+        - name: store_application 
+          image: crazycoderrr/store_service 
+          envFrom:
+            secretRef:
+              - name: project-secret-store 
+          ports:
+            - containerPort: 8005 
+          resources:
+            requests:
+              cpu: "0.5"
+              memory: "4Gi"
+            limits:
+              cpu: "0.7"
+              memory: "4Gi"
+          hostNetwork: true 
+          dnsPolicy: Default 
