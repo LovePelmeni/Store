@@ -4,11 +4,14 @@ metadata:
   app: store-postgresql-database 
 
 spec:
+
   selector:
     matchLabels:
       app: store-postgresql-database 
+
   template:
     app: store-postgresql-database 
+    
     spec:
       containers:
         - name: postgresql_database 
@@ -24,7 +27,8 @@ spec:
               value: postgres_password 
           ports:
             - containerPort: 5435 
-
+          
+          command: ["-p", "5435"]
           dnsPolicy: Default 
           hostNetwork: true  
 

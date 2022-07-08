@@ -1,33 +1,43 @@
 apiVersion: apps/v1 
 kind: Deployment 
+
 metadata:
   app: store-nginx-server 
   labels:
     type: local 
 
 spec:
+
   selector:
     matchLabels:
       app: store-nginx-server 
+
   template:
     app: store-nginx-server 
     spec:
+
       volumes:
         - name: NginxConfiguration 
           hostPath:
             path: ./nginx/nginx.conf 
+
       containers:
+
         - name: nginx-server 
           image: nginx:latest 
           ports:
             - containerPort: 80 
+
           volumeMounts:
             - mountPath: /etc/nginx/nginx.conf 
               name: NginxConfiguration 
+
           resources:  
             requests:
               memory: "1Gi"
             limits:
               memory: "1Gi"
+
           dnsPolicy: Default 
           hostNetwork: true 
+          restartPolicy: onFailure 

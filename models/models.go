@@ -35,13 +35,13 @@ var (
 )
 
 func init() {
-	LogFile, error := os.OpenFile("databaseLogs.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY)
+	LogFile, error := os.OpenFile("databaseLogs.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
 	if error != nil {panic("Failed to Initialize Database Log File.")}
 
-	DebugLogger = log.Logger(LogFile, "DEBUG: ")
-	InfoLogger = log.Logger(LogFile, "INFO: ")
-	ErrorLogger = log.Logger(LogFile, "ERROR: ")
-	WarnLogger = log.Logger(LogFile, "WARNING: ")
+	DebugLogger = log.New(LogFile, "DEBUG: ", log.Ldate|log.Ltime|log.Lshortfile)
+	InfoLogger = log.New(LogFile, "INFO: ", log.Ldate|log.Ltime|log.Lshortfile)
+	ErrorLogger = log.New(LogFile, "ERROR: ", log.Ldate|log.Ltime|log.Lshortfile)
+	WarnLogger = log.New(LogFile, "WARNING: ", log.Ldate|log.Ltime|log.Lshortfile)
 }
 
 type Product struct {
