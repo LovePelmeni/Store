@@ -2,16 +2,17 @@ apiVersion: apps/v1
 kind: Deployment 
 
 metadata:
-  app: store-application-service 
+  name: store-application-server
+  namespace: store_namespace 
   labels: 
-    app: store-application-service 
+    app: store-application-server
 
 spec:
   selector:
     matchLabels:  
-      app: store-application-service 
+      app: store-application-server
   template:
-    app: store-application-service 
+    app: store-application-server 
     spec:
       containers:
         - name: store_application 
@@ -29,4 +30,20 @@ spec:
               cpu: "0.7"
               memory: "4Gi"
           hostNetwork: true 
-          dnsPolicy: Default 
+          dnsPolicy: Default
+
+          livenessProbe:
+            httpGet:
+              path: /healthcheck/
+              protocol: HTTP 
+              port: 8005 
+              startPeriod: 30s 
+              initialSeconds: 10
+          
+        - name: email_application 
+          image: some_image:latest 
+          envFrom:
+            configMap:
+              - name: ConfigMapView 
+                
+

@@ -1,10 +1,11 @@
 apiVersion: apps/v1 
 kind: Deployment 
+
 metadata:
   app: store-postgresql-database 
+  namespace: store_namespace 
 
 spec:
-
   selector:
     matchLabels:
       app: store-postgresql-database 
@@ -18,13 +19,22 @@ spec:
           image: postgres:latest 
           env:
             - name: POSTGRES_DB 
-              value: application_db 
+              valueFrom:
+                configMapKeyRef:
+                  - name: postgres-config-map 
+                    value: POSTGRES_DB  
 
             - name: POSTGRES_USER 
-              value: postgres_user 
+              valueFrom:
+                configMapKeyRef:
+                  - name: postgres-config-map 
+                    value: POSTGRES_USER 
 
             - name: POSTGRES_PASSWORD
-              value: postgres_password 
+              valueFrom:
+                configMapKeyRef:
+                  - name: postgres-config-map 
+                    value: POSTGRES_PASSWORD 
           ports:
             - containerPort: 5435 
           

@@ -2,6 +2,7 @@ apiVersion: apps/v1
 kind: Deployment 
 
 metadata:
+  namespace: kafka_namespace # Kafka Namespace for the Deployment
   app: store-app-kafka-server 
   labels:
     app: store-app-kafka-server 

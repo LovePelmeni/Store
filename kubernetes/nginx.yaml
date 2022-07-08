@@ -1,8 +1,9 @@
 apiVersion: apps/v1 
 kind: Deployment 
 
-metadata:
-  app: store-nginx-server 
+metadata: 
+  name: store-nginx-server 
+  namespace: store_namespace 
   labels:
     type: local 
 
@@ -22,12 +23,10 @@ spec:
             path: ./nginx/nginx.conf 
 
       containers:
-
         - name: nginx-server 
           image: nginx:latest 
           ports:
             - containerPort: 80 
-
           volumeMounts:
             - mountPath: /etc/nginx/nginx.conf 
               name: NginxConfiguration 
@@ -36,8 +35,15 @@ spec:
             requests:
               memory: "1Gi"
             limits:
-              memory: "1Gi"
+              memory: "1Gi" 
 
+          livenessProbe:
+            httpGet:
+              - path: /healtcheck/
+                port: 80 
+                protocol: HTTP
+          
           dnsPolicy: Default 
           hostNetwork: true 
           restartPolicy: onFailure 
+

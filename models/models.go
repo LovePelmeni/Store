@@ -46,7 +46,6 @@ func init() {
 
 type Product struct {
 	gorm.Model 
-
 	ProductName string `gorm:"VARCHAR(100) NOT NULL"`
 	ProductDescription string `gorm:"VARCHAR(100) NOT NULL DEFAULT 'This Product Has No Description'"`
 	ProductPrice string `gorm:"NUMERIC(10, 5) NOT NULL"`
@@ -55,7 +54,6 @@ type Product struct {
 
 type Customer struct {
 	gorm.Model 
-
 	Username string `gorm:"VARCHAR(100) NOT NULL"`
 	Password string `gorm:"VARCHAR(100) NOT NULL"`
 	Email string `gorm:"VARCHAR(100) NOT NULL"`
@@ -63,9 +61,32 @@ type Customer struct {
 	CreatedAt time.Time `gorm:"DATE DEFAULT CURRENT DATE"`
 }
 
-type Card struct {
+type Cart struct {
 	gorm.Model 
+	Owner Customer `gorm:"foreignKey:Customer;references:CustomerId"`
+	Products Product `gorm:"foreignKey:Customer;references:ProductId"`
+}
+
+func OneOwnerConstraintTrigger() {
+	// Adds trigger constraint that allows to have only one Owner Per Cart, In avoid of merging Orders.
+	command := fmt.Sprintf(`CREATE FUNCTION public.check_one_cart_owner() 
+	RETURNS TRIGGER 
+	LANGUAGE 'plpgsql'
+	AS $BODY$ 
+	DECLARE updated integer;
+	BEGIN UPDATE %s SET owner = owner + 1 WHERE cart.id = NEW.cart_id AND cart.owner < 1;
+	GET DIAGNOSTICS addedOwners = ROW_COUNT 
+	IF addedOwners = 0 THEN 
+	RAISE EXCEPTION 'Cart can have only one owner.'
+
+	END IF;
+	RETURN NEW;
+	END; 
+	$BODY$;
 	
-	Owner Customer 
-	Products Product 
+	CREATE TRIGGER OwnerCartConstraintTrigger 
+	BEFORE INSERT ON public.cart
+	FOR EACH ROW EXECUTE PROCEDURE public.check_one_cart_owner();`, "cart")
+	Database.Exec(command)
+	DebugLogger.Println("Unique Constraint Has Been Integrated.")
 }

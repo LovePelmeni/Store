@@ -30,7 +30,7 @@ func init() {
 	Failed := models.Database.AutoMigrate(
 		&models.Product{},
 		&models.Customer{},
-		&models.Card{},
+		&models.Cart{},
 	)
 	if Failed != nil {
 		panic(fmt.Sprintf("Failed To Auto Migrate, Error: %s"))
