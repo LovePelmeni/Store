@@ -9,6 +9,7 @@ metadata:
     type: local 
 
 spec:
+  hostname: kafka_server 
   selector:
 
     matchLabels:

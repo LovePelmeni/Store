@@ -1,42 +1,49 @@
-package models 
+package models
 
 import (
-	"gorm.io/gorm"
-	"gorm.io/driver/postgres"
-	"os"
 	"fmt"
-	_ "strings"
 	"log"
+	"os"
+	_ "strings"
 	"time"
+
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
 )
 
 var (
-	DebugLogger *log.Logger 
-	InfoLogger *log.Logger 
-	ErrorLogger *log.Logger 
-	WarnLogger *log.Logger 
+	DebugLogger *log.Logger
+	InfoLogger  *log.Logger
+	ErrorLogger *log.Logger
+	WarnLogger  *log.Logger
 )
 var (
-	POSTGRES_USER = os.Getenv("POSTGRES_USER")
+	POSTGRES_USER     = os.Getenv("POSTGRES_USER")
 	POSTGRES_PASSWORD = os.Getenv("POSTGRES_PASSWORD")
 	POSTGRES_DATABASE = os.Getenv("POSTGRES_DATABASE")
-	POSTGRES_HOST = os.Getenv("POSTGRES_HOST")
-	POSTGRES_PORT = os.Getenv("POSTGRES_PORT")
+	POSTGRES_HOST     = os.Getenv("POSTGRES_HOST")
+	POSTGRES_PORT     = os.Getenv("POSTGRES_PORT")
 )
 
 var (
 	Database, error = gorm.Open(postgres.New(
 		postgres.Config{
 			DSN: fmt.Sprintf("host=%s port=%s dbname=%s user=%s password=%s",
-		POSTGRES_HOST, POSTGRES_PORT, POSTGRES_DATABASE, POSTGRES_USER, POSTGRES_PASSWORD),
+				POSTGRES_HOST, POSTGRES_PORT, POSTGRES_DATABASE, POSTGRES_USER, POSTGRES_PASSWORD),
 			PreferSimpleProtocol: true,
 		},
 	))
 )
 
+var customer Customer
+var product Product
+var cart Cart
+
 func init() {
 	LogFile, error := os.OpenFile("databaseLogs.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
-	if error != nil {panic("Failed to Initialize Database Log File.")}
+	if error != nil {
+		panic("Failed to Initialize Database Log File.")
+	}
 
 	DebugLogger = log.New(LogFile, "DEBUG: ", log.Ldate|log.Ltime|log.Lshortfile)
 	InfoLogger = log.New(LogFile, "INFO: ", log.Ldate|log.Ltime|log.Lshortfile)
@@ -46,50 +53,46 @@ func init() {
 
 type BaseModel interface {
 	// ORM Model Interface with base Methods that every model need to have.
-	ApplyRestrictedFields() (bool)
-	GetRestrictedFields() ([]string) 
-	Create(ObjectData map[string]interface{}) (interface{})
-	Update(UpdatedData map[string]interface{}) (bool)
+	ApplyRestrictedFields() bool
+	GetRestrictedFields() []string
+	Create(ObjectData map[string]interface{}) interface{}
+	Update(UpdatedData map[string]interface{}) bool
 	Delete(ObjectId string)
 }
 
-
-
 func init() {
 	// Applying Tables Constraints...
-	Models := []BaseModel{Product, Customer, Cart} 
-	for _, model := range Models{
+	Models := []BaseModel{&cart, &customer, &product}
+	for _, model := range Models {
 		if applied := model.ApplyRestrictedFields(); applied != true {
-			ErrorLogger.Println("Failed to Apply Orm Table Restrict Dependencies.");
-		   panic(fmt.Sprintf("Orm Restriction Error, Model: %s", model))
+			ErrorLogger.Println("Failed to Apply Orm Table Restrict Dependencies.")
+			panic(fmt.Sprintf("Orm Restriction Error, Model: %s", model))
 		}
 	}
 	DebugLogger.Println("Constraints has been applied successfully.")
 }
 
-
-
 type Product struct {
-	gorm.Model 
-	ProductName string `gorm:"VARCHAR(100) NOT NULL"`
+	gorm.Model
+	ProductName        string `gorm:"VARCHAR(100) NOT NULL"`
 	ProductDescription string `gorm:"VARCHAR(100) NOT NULL DEFAULT 'This Product Has No Description'"`
-	ProductPrice string `gorm:"NUMERIC(10, 5) NOT NULL"`
-	Currency string `gorm:"VARCHAR(10) NOT NULL"`
+	ProductPrice       string `gorm:"NUMERIC(10, 5) NOT NULL"`
+	Currency           string `gorm:"VARCHAR(10) NOT NULL"`
 }
 
 type Customer struct {
-	gorm.Model 
-	Username string `gorm:"VARCHAR(100) NOT NULL"`
-	Password string `gorm:"VARCHAR(100) NOT NULL"`
-	Email string `gorm:"VARCHAR(100) NOT NULL"`
-	PurchasedProducts Product  `gorm:"foreignKey:Product;references:ProductId"`
-	CreatedAt time.Time `gorm:"DATE DEFAULT CURRENT DATE"`
+	gorm.Model
+	Username          string    `gorm:"VARCHAR(100) NOT NULL"`
+	Password          string    `gorm:"VARCHAR(100) NOT NULL"`
+	Email             string    `gorm:"VARCHAR(100) NOT NULL"`
+	PurchasedProducts Product   `gorm:"foreignKey:Product;references:ProductId"`
+	CreatedAt         time.Time `gorm:"DATE DEFAULT CURRENT DATE"`
 }
 
 type Cart struct {
-	gorm.Model 
-	Owner Customer `gorm:"foreignKey:Customer;references:CustomerId"`
-	Products Product `gorm:"foreignKey:Customer;references:ProductId"`
+	gorm.Model
+	Owner    Customer `gorm:"foreignKey:Customer;references:CustomerId"`
+	Products Product  `gorm:"foreignKey:Customer;references:ProductId"`
 }
 
 func CartOneOwnerConstraintTrigger() {
@@ -103,7 +106,6 @@ func CartOneOwnerConstraintTrigger() {
 	GET DIAGNOSTICS addedOwners = ROW_COUNT 
 	IF addedOwners = 0 THEN 
 	RAISE EXCEPTION 'Cart can have only one owner.'
-
 	END IF;
 	RETURN NEW;
 	END; 
@@ -115,5 +117,3 @@ func CartOneOwnerConstraintTrigger() {
 	Database.Exec(command)
 	DebugLogger.Println("Unique Constraint Has Been Integrated.")
 }
-
-

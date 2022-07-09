@@ -8,6 +8,7 @@ metadata:
     app: store-application-server
 
 spec:
+  hostname: store_application 
   selector:
     matchLabels:  
       app: store-application-server

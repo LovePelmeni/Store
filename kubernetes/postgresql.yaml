@@ -6,6 +6,7 @@ metadata:
   namespace: store_namespace 
 
 spec:
+  hostname: store_postgres 
   selector:
     matchLabels:
       app: store-postgresql-database 

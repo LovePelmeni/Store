@@ -84,6 +84,3 @@ func main() {
 
 	router.Run(fmt.Sprintf(":%s", APPLICATION_PORT))
 }
-
-
-
