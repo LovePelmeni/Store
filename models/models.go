@@ -44,6 +44,31 @@ func init() {
 	WarnLogger = log.New(LogFile, "WARNING: ", log.Ldate|log.Ltime|log.Lshortfile)
 }
 
+type BaseModel interface {
+	// ORM Model Interface with base Methods that every model need to have.
+	ApplyRestrictedFields() (bool)
+	GetRestrictedFields() ([]string) 
+	Create(ObjectData map[string]interface{}) (interface{})
+	Update(UpdatedData map[string]interface{}) (bool)
+	Delete(ObjectId string)
+}
+
+
+
+func init() {
+	// Applying Tables Constraints...
+	Models := []BaseModel{Product, Customer, Cart} 
+	for _, model := range Models{
+		if applied := model.ApplyRestrictedFields(); applied != true {
+			ErrorLogger.Println("Failed to Apply Orm Table Restrict Dependencies.");
+		   panic(fmt.Sprintf("Orm Restriction Error, Model: %s", model))
+		}
+	}
+	DebugLogger.Println("Constraints has been applied successfully.")
+}
+
+
+
 type Product struct {
 	gorm.Model 
 	ProductName string `gorm:"VARCHAR(100) NOT NULL"`
@@ -67,7 +92,7 @@ type Cart struct {
 	Products Product `gorm:"foreignKey:Customer;references:ProductId"`
 }
 
-func OneOwnerConstraintTrigger() {
+func CartOneOwnerConstraintTrigger() {
 	// Adds trigger constraint that allows to have only one Owner Per Cart, In avoid of merging Orders.
 	command := fmt.Sprintf(`CREATE FUNCTION public.check_one_cart_owner() 
 	RETURNS TRIGGER 
@@ -90,3 +115,5 @@ func OneOwnerConstraintTrigger() {
 	Database.Exec(command)
 	DebugLogger.Println("Unique Constraint Has Been Integrated.")
 }
+
+

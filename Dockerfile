@@ -10,8 +10,10 @@ RUN apk add build-base
 COPY ./go.mod ./ && COPY ./go.sum ./
 COPY . .
 
-RUN go mod download && go mod vendor 
+RUN go mod tidy && go mod vendor 
 RUN go test -v ./tests/...  
 
 RUN go build -o ./main/main.go 
 ENTRYPOINT ["go", "run", "./main/main.go"]
+
+

@@ -6,8 +6,8 @@ metadata:
   namespace: ingress_namespace  # Ingress Namespace.
 
 spec:
+  type: ClusterIP
   selector:
-
     matchLabels:
       app: store-nginx-server 
 
