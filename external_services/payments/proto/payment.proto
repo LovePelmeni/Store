@@ -1,0 +1,49 @@
+syntax = "proto3";
+package payments;
+
+service PaymentIntent {
+  rpc CreatePaymentIntent(PaymentIntentParams) returns (PaymentIntentResponse);
+}
+
+service PaymentSession {
+  rpc CreatePaymentSession(PaymentSessionParams) returns (PaymentSessionResponse);
+}
+
+service Refund {
+  rpc CreateRefund(RefundParams) returns (RefundResponse);
+}
+
+// Request Params.
+
+message PaymentIntentParams {
+  string productId = 1;
+  string purchaserId = 2;
+  string currency = 3;
+  string price = 4;
+}
+
+message PaymentSessionParams {
+  string productId = 1;
+  string purchaserId = 2;
+}
+
+message RefundParams {
+  string paymentId = 1;
+  string purchaserId = 2;
+}
+
+
+// Response Models
+
+message PaymentSessionResponse {
+  string PaymentSessionId = 1;
+}
+
+message PaymentIntentResponse {
+  string PaymentIntentId = 1;
+}
+
+message RefundResponse {
+  string RefundId = 1;
+}
+
