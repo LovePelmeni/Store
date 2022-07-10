@@ -1,20 +1,17 @@
 apiVersion: apps/v1 
-kind: Deployment 
+kind: StatefulSet
 
 metadata:
   app: store-postgresql-database 
   namespace: store_namespace 
 
 spec:
-  hostname: store_postgres 
-  selector:
-    matchLabels:
-      app: store-postgresql-database 
-
   template:
-    app: store-postgresql-database 
+    metadata:
+      app: postgres_application 
     
     spec:
+      replicas: 3 
       containers:
         - name: postgresql_database 
           image: postgres:latest 

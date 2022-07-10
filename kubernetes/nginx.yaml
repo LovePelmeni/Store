@@ -6,15 +6,16 @@ metadata:
   namespace: ingress_namespace  # Ingress Namespace.
 
 spec:
-  type: ClusterIP
   selector:
     matchLabels:
-      app: store-nginx-server 
+      app: store_entrypoint
 
   template:
-    app: store-nginx-server 
+    metadata:
+      labels:
+        app: store-nginx-server 
+        
     spec:
-
       volumes:
         - name: NginxConfiguration 
           hostPath:

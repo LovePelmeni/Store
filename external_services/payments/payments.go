@@ -23,27 +23,30 @@ type PaymentInterface interface {
 }
 
 
-type PaymentCredentialsInterface interface {
-	GetCredentials()
-	Validate() error 
+type PaymentInfoCredentials struct {
+
+	mutex sync.RWMutex 
+
+	PaymentSessionId string `json:"PaymentSessionId"`		
+	ProductId string 	`json:"ProductId"`
+	CustomerId string 	`json:"CustomerId"`
+	Currency string 	`json:"Currency"`
+	Price string 		`json:"Price"`
+}
+
+type PaymentCheckoutInfo struct {
+	sync.RWMutex 
+	
+	PaymentId string `json:"PaymentId"`
+	PurchaserId string `json:"PurchaserId"`
+	Products []models.Products `json:"Products"`
+	TotalPrice string `json:"TotalPrice"`
+	Currency string `json:"Currency"`
+	CreatedAt time.Time `json:"CreatedAt"`
 }
 
 
-type Payment struct {}
-
-
-type PaymentCredentials struct {}
-
-
-
-
-func StartPaymentProcess() {
-
-}
-
-
-
-func (this *Payment) Pay(PaymentCredentials PaymentCredentialsInterface) error {
+func (this *Payment) Pay(PaymentCredentials PaymentInfoCredentials)  error {
 
 
 	if valid := PaymentCredentials.Validate(); valid != nil {
@@ -60,7 +63,6 @@ func (this *Payment) Pay(PaymentCredentials PaymentCredentialsInterface) error {
 
 		if paymentElement == "Price" && len(strings.Split(paymentValue, ".")) != 2{
 			 // checks If Price has Appropriate Format "whatever_value.0000"
-		
 			paymentIntent += fmt.Sprintf(".%s", "0")
 		}
 
@@ -75,90 +77,87 @@ func (this *Payment) Pay(PaymentCredentials PaymentCredentialsInterface) error {
 	group := sync.WaitGroup{}
 
 
-
 	// Payment Intent Obtaining...
 
-	go func (group *sync.WaitGroup, client *grpc.Client, channel chan struct{},
-		PaymentValidatedData struct{ProductId string; PurchaserId string; Currency string; Price string}) {
+	go func (group *sync.WaitGroup, client *grpc.Client, channel chan struct{}, PaymentValidatedData PaymentInfoCredentials) {
 
+			group.Add(1)
+
+			PaymentRequestParams := paymentClient.PaymentIntentParams{
+				ProductId: PaymentValidatedData.ProductId,
+				PurchaserId: PaymentValidatedData.PurchaserId, 
+				Currency: PaymentValidatedData.Currency,
+				Price: PaymentValidatedData.Price,
+			}
+
+			RequestContext, CancelError := context.WithTimeout(context.Background(), 10 * time.Second)
+			response, ResponseError := client.CreatePaymentIntent(RequestContext, PaymentRequestParams)
+
+			if errors.Is(ResponseError, error){
+			ErrorLogger.Println(fmt.Sprintf(
+			"Payment Failed. Reason: %s", ResponseError), group.Abort())
+
+			}else{
+			// Sending Channel 
+			channel <- struct{PaymentIntentId}{
+			PaymentIntentId: response.PaymentIntentId}
+			}
 			
-		group.Add(1)
-
-		PaymentRequestParams := paymentClient.PaymentIntentParams{
-			ProductId: PaymentValidatedData.ProductId,
-			PurchaserId: PaymentValidatedData.PurchaserId, 
-			Currency: PaymentValidatedData.Currency,
-			Price: PaymentValidatedData.Price,
-		}
-
-		RequestContext, CancelError := context.WithTimeout(context.Background(), 10 * time.Second)
-		response, ResponseError := client.CreatePaymentIntent(RequestContext, PaymentRequestParams)
-
-		if errors.Is(ResponseError, error){
-		ErrorLogger.Println(fmt.Sprintf(
-		"Payment Failed. Reason: %s", ResponseError), group.Abort())
-
-		}else{
-		// Sending Channel 
-		channel <- struct{PaymentIntentId}{
-		PaymentIntentId: response.PaymentIntentId}
-		}
-		
-		defer CancelError()
-		group.Done()
-	}()
+			defer CancelError()
+			group.Done()
 
 
 
 
-	// Processing Payment based on Received Payment Intent 
-	go func (group *sync.WaitGroup, client *grpc.Client, channel chan struct{}){
+		// Processing Payment based on Received Payment Intent 
+		go func (group *sync.WaitGroup, client *grpc.Client){
 
-		group.Add(1)
-		select {
+			group.Add(1)
+			select {
 
-			case data := <- channel:
-				// Receives Payment Intent and Processing Payment.
-				data := <- channel 
-				var decodedData struct{PaymentIntentId string}
-				decodedDataError := json.Unmarshal(data, &decodedData)
+				case data := <- channel:
+					// Receives Payment Intent and Processing Payment.
+					data := <- channel 
+					var decodedData struct{PaymentId string}
+					decodedDataError := json.Unmarshal(data, &decodedData)
 
-				if decodedDataError != nil {ErrorLogger.Println("Invalid Data Format.")}
-
-				CheckoutRequestParams := 
-				RequestContext, CancelError := context.WithTimeout(context.Background(), 10 * time.Second)
-				CheckoutContext := client.GetPaymentCheckout()
+					if decodedDataError != nil {ErrorLogger.Println("Invalid Data Format.")}
 
 
-				group.Done()
-				
-			default:
-				InfoLogger.Println("Operation Failed, Aborting Silently...")
-				group.Abort()
-		}
-	}()
+					checkoutParams := CheckoutRequestParams{PaymentId: decodedData.PaymentId}
+					RequestContext, CancelError := context.WithTimeout(context.Background(), 10 * time.Second)
+					CheckoutResponseconst, error := client.GetPaymentCheckout(checkoutParams)
+
+
+					if error != nil {ErrorLogger.Println(
+					fmt.Sprintf("Failed to Receive Checkout Info about the Payment with ID: %s",
+				    &checkoutParams.PaymentId))} else  {
 
 
 
-	// Processing Checkout ...
-	go func (group *sync.WaitGroup, client *grpc.Client, channel chan struct{}) {
 
-		group.Add(1)
-		select {
-			case data := <- channel != nil:
-				var decodedData struct{PaymentIntentId string}
-				decodedDataError := json.Unmarshal(data, &decodedData)
-				group.Done()
-			
-			default:
-				InfoLogger.Println("Operation Aborting...")
-				group.Abort()
-		}
-	}()
+								// Processing Sending Email... About the Purchased Order.
+						go func (group *sync.WaitGroup, client *grpc.Client, channel chan struct{}, PaymentCredentials *Payment) {
 
+								group.Add(1)
+								
+						}()
+					}
+					
+
+					group.Done()
+					defer CancelError()
+					
+				default:
+					InfoLogger.Println("Operation Failed, Aborting Silently...")
+					group.Abort()
+			}
+		}()
 
 	group.Wait()
 	return true, nil 
+
+	}()
 }
 
 

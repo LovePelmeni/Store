@@ -13,7 +13,9 @@ spec:
     matchLabels:  
       app: store-application-server
   template:
-    app: store-application-server 
+    metadata:
+      labels: 
+        app: store_entrypoint 
     spec:
       containers:
         - name: store_application 
@@ -22,7 +24,9 @@ spec:
             secretRef:
               - name: project-secret-store 
           ports:
-            - containerPort: 8005 
+            - targetPort: 8005 
+              protocol: TCP 
+              port: 8005 
           resources:
             requests:
               cpu: "0.5"

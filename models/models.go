@@ -74,25 +74,30 @@ func init() {
 
 type Product struct {
 	gorm.Model
-	ProductName        string `gorm:"VARCHAR(100) NOT NULL"`
-	ProductDescription string `gorm:"VARCHAR(100) NOT NULL DEFAULT 'This Product Has No Description'"`
-	ProductPrice       string `gorm:"NUMERIC(10, 5) NOT NULL"`
-	Currency           string `gorm:"VARCHAR(10) NOT NULL"`
+	OwnerId            string
+	Owner              Customer `gorm:"foreignKey: Customer;references:OwnerId"`
+	ProductName        string   `gorm:"VARCHAR(100) NOT NULL"`
+	ProductDescription string   `gorm:"VARCHAR(100) NOT NULL DEFAULT 'This Product Has No Description'"`
+	ProductPrice       string   `gorm:"NUMERIC(10, 5) NOT NULL"`
+	Currency           string   `gorm:"VARCHAR(10) NOT NULL"`
 }
 
 type Customer struct {
 	gorm.Model
-	Username          string    `gorm:"VARCHAR(100) NOT NULL"`
-	Password          string    `gorm:"VARCHAR(100) NOT NULL"`
-	Email             string    `gorm:"VARCHAR(100) NOT NULL"`
+	Username          string `gorm:"VARCHAR(100) NOT NULL"`
+	Password          string `gorm:"VARCHAR(100) NOT NULL"`
+	Email             string `gorm:"VARCHAR(100) NOT NULL"`
+	ProductId         string
 	PurchasedProducts Product   `gorm:"foreignKey:Product;references:ProductId"`
 	CreatedAt         time.Time `gorm:"DATE DEFAULT CURRENT DATE"`
 }
 
 type Cart struct {
 	gorm.Model
-	Owner    Customer `gorm:"foreignKey:Customer;references:CustomerId"`
-	Products Product  `gorm:"foreignKey:Customer;references:ProductId"`
+	CustomerId string
+	ProductId  string
+	Owner      Customer `gorm:"foreignKey:Customer;references:CustomerId"`
+	Products   Product  `gorm:"foreignKey:Customer;references:ProductId"`
 }
 
 func CartOneOwnerConstraintTrigger() {

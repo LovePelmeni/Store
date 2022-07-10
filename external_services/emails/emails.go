@@ -4,6 +4,7 @@ import (
 	"os"
 
 	"log"
+
 	"github.com/LovePelmeni/OnlineStore/EmailService/emails/proto/grpcControllers"
 	"github.com/LovePelmeni/OnlineStore/StoreService/external_services/exceptions"
 	"google.golang.org/grpc"
@@ -125,4 +126,3 @@ func (this *grpcEmailSender) SendRejectEmail(customerEmail string, message strin
 	response, ResponseError := client.SendOrderEmail(RequestParams)
 	return response.Delivered, ResponseError
 }
-

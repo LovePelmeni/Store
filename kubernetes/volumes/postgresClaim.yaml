@@ -5,9 +5,13 @@ metadata:
   namespace: store_namespace 
 
 spec:
-  StorageClassName: manual 
+  StorageClassName: {{ ./VolumeSettings.StorageClassName }} 
   accessModes:
-    - ReadWriteOnce  
+    - {{ ./VolumeSettings.AccessModes }}
   resources:
     requests:
-      storage: 3Gi 
+      storage: {{ ./VolumeSettings.StorageCapacity }}
+    limits:
+      storage: {{ ./VolumeSettings.LimitStorageCapacity }}
+
+

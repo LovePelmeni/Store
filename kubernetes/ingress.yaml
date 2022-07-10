@@ -15,6 +15,6 @@ spec:
       paths:
         path: "/"
         backend: 
-          serviceName: store-nginx-server 
-          servicePort: 8000
+          serviceName: applicationService 
+          servicePort: 8010
     

@@ -1,0 +1,18 @@
+apiVersion: v1 
+kind: Service
+metadata:
+  name: postgresService 
+  namespace: ingress_namespace 
+spec:
+  type: ClusterIP
+  selector:
+    matchLabels:
+      app: postgres_application 
+  ports:
+    - name: store-postgresql-database 
+      port: 5435 # Port of this Service 
+      targetPort: 5435 # Port of the PostgreSQL Container that Postgres is running on ...
+      protocol: TCP
+
+
+

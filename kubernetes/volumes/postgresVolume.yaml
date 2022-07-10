@@ -2,14 +2,13 @@ apiVersion: apps/v1
 kind: PersistentVolume 
 metadata:
   name: persistent-postgres-volume
-  labels:
-    type: local 
+  namespace: store_namespace 
 
 spec:
-  StorageClassName: manual 
+  StorageClassName: {{ ./VolumeSettings.StorageClassName }} 
   accessModes:  
-    - ReadWriteOnlyOnce 
+    - {{ ./VolumeSettings.AccessModes }}
   capacity:
-    storage: 5Gi 
+    storage: {{ ./VolumeSettings.StorageCapacity }}
   hostPath:
     path: "/postgres/data"

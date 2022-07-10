@@ -1,0 +1,9 @@
+StorageClassName: manual 
+StorageCapacity: "5Gi"
+AccessModes: ReadWriteOnlyOnce 
+LimitStorageCapacity: "10Gi"
+
+
+
+
+
