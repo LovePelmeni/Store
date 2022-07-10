@@ -35,9 +35,9 @@ var (
 	))
 )
 
-var customer Customer
-var product Product
-var cart Cart
+var customer *Customer
+var product *Product
+var cart *Cart
 
 func init() {
 	LogFile, error := os.OpenFile("databaseLogs.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
@@ -62,7 +62,7 @@ type BaseModel interface {
 
 func init() {
 	// Applying Tables Constraints...
-	Models := []BaseModel{&cart, &customer, &product}
+	Models := []BaseModel{}
 	for _, model := range Models {
 		if applied := model.ApplyRestrictedFields(); applied != true {
 			ErrorLogger.Println("Failed to Apply Orm Table Restrict Dependencies.")
@@ -75,11 +75,22 @@ func init() {
 type Product struct {
 	gorm.Model
 	OwnerId            string
-	Owner              Customer `gorm:"foreignKey: Customer;references:OwnerId"`
-	ProductName        string   `gorm:"VARCHAR(100) NOT NULL"`
-	ProductDescription string   `gorm:"VARCHAR(100) NOT NULL DEFAULT 'This Product Has No Description'"`
-	ProductPrice       string   `gorm:"NUMERIC(10, 5) NOT NULL"`
-	Currency           string   `gorm:"VARCHAR(10) NOT NULL"`
+	Owner              *Customer `gorm:"foreignKey: Customer;references:OwnerId"`
+	ProductName        string    `gorm:"VARCHAR(100) NOT NULL"`
+	ProductDescription string    `gorm:"VARCHAR(100) NOT NULL DEFAULT 'This Product Has No Description'"`
+	ProductPrice       string    `gorm:"NUMERIC(10, 5) NOT NULL"`
+	Currency           string    `gorm:"VARCHAR(10) NOT NULL"`
+}
+
+func (this *Product) Create(ObjectData map[string]interface{}) *Product {
+
+}
+func (this *Product) Update(ObjId string, UpdatedData map[string]interface{}) bool {
+
+}
+
+func (this *Product) Delete(ObjId string) bool {
+
 }
 
 type Customer struct {
@@ -92,12 +103,34 @@ type Customer struct {
 	CreatedAt         time.Time `gorm:"DATE DEFAULT CURRENT DATE"`
 }
 
+func (this *Customer) Create(ObjectData map[string]interface{}) *Product {
+
+}
+func (this *Customer) Update(ObjId string, UpdatedData map[string]interface{}) bool {
+
+}
+
+func (this *Customer) Delete(ObjId string) bool {
+
+}
+
 type Cart struct {
 	gorm.Model
 	CustomerId string
 	ProductId  string
 	Owner      Customer `gorm:"foreignKey:Customer;references:CustomerId"`
 	Products   Product  `gorm:"foreignKey:Customer;references:ProductId"`
+}
+
+func (this *Cart) Create(ObjectData map[string]interface{}) *Product {
+
+}
+func (this *Cart) Update(ObjId string, UpdatedData map[string]interface{}) bool {
+
+}
+
+func (this *Cart) Delete(ObjId string) bool {
+
 }
 
 func CartOneOwnerConstraintTrigger() {
