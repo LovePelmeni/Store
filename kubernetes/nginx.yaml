@@ -16,10 +16,17 @@ spec:
         app: store-nginx-server 
         
     spec:
+
       volumes:
+
         - name: NginxConfiguration 
           hostPath:
-            path: EmailService/nginx/nginx.conf 
+            path: StoreService/nginx/nginx.conf 
+
+        - name: NginxErrorTemplatesVolume 
+          hostPath:
+            path: StoreService/nginx/nginx_error_templates
+
 
       containers:
         - name: store-nginx-server 
@@ -30,8 +37,12 @@ spec:
               protocol: TCP 
 
           volumeMounts:
+
             - mountPath: /etc/nginx/nginx.conf 
               name: NginxConfiguration
+
+            - mountPath: /usr/share/www/nginx/error_templates
+              name: NginxErrorTemplatesVolume 
 
           resources:  
             requests:
