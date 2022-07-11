@@ -1,13 +1,12 @@
 package authentication
 
 import (
+	"errors"
 	"log"
-
 	"time"
 
 	"github.com/LovePelmeni/OnlineStore/StoreService/models"
 	jwt "github.com/dgrijalva/jwt-go"
-	"errors"
 )
 
 var (
@@ -20,7 +19,6 @@ var (
 	ErrorLogger *log.Logger
 	WarnLogger  *log.Logger
 )
-
 
 // Jwt Exceptions..
 func InvalidJwt() error {
@@ -39,14 +37,9 @@ func JwtDecodeError() error {
 	return errors.New("Failed to Decode JWT Token.")
 }
 
-
-
-
 func init() {
 
 }
-
-
 
 type JwtToken struct {
 	jwt.StandardClaims
@@ -73,38 +66,32 @@ func CreateJwtToken(Username string, Email string) string {
 	return stringToken
 }
 
-
 type JwtValidator struct {
 	Token string
 }
 
 type DecodedJwtData struct {
-	Username string 
-	Email string 
-}
-
-
-func (this *JwtValidator) Valid() error {
-
-	claims := &DecodedJwtData{}
-	parsedData, error := jwt.ParseWithClaims(this.Token, &JwtValidator{}, jwt.Keyfunc(token *jwt.Token) (interface{}, error){
-	return secretKey, nil})
-
-	if errors.Is(error, jwt.ErrInvalidKey) {
-		return InvalidJwtKey()
-	}
-	if errors.Is(error, jwt.ErrSignatureInvalid){
-		return InvalidJwtSignature()
-	}
-	return nil 
+	Username string
+	Email    string
 }
 
 func CheckValidJwtToken(token string) error {
-	validator := JwtValidator{Token: token}
-	DecodedError := validator.Valid();
-    DecodedError != nil{return InvalidJwt()}
+
+	var customer models.Customer
+	DecodedData := &JwtToken{}
+	DecodedToken, error := jwt.ParseWithClaims(token, DecodedData,
+		func(token *jwt.Token) (interface{}, error) { return secretKey, nil })
+	_ = DecodedToken
+
+	if error != nil {
+		InfoLogger.Println("Invalid Jwt Token")
+		return InvalidJwt()
+	}
 
 	if customer := models.Database.Table("customers").Where("Username = ? AND Email = ?",
-	 decodedTokenData.Username, decodedTokenData.Email).First(); customer.Error != nil {return InvalidJwt()}
-	return nil 
+		DecodedData.Username,
+		DecodedData.Email).First(&customer); customer.Error != nil {
+		return InvalidJwt()
+	}
+	return nil
 }

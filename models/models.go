@@ -7,6 +7,9 @@ import (
 	_ "strings"
 	"time"
 
+	"reflection"
+	"regexp"
+
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -35,6 +38,48 @@ var (
 	))
 )
 
+var ValidationError error
+
+type BaseValidator interface {
+	// Base Validator Interface ...
+	Validate() (string, ValidationError)
+}
+
+var (
+	Validators = []BaseValidator{
+		PriceValidator{},
+		CurrencyValidator{},
+	}
+)
+
+type CurrencyValidator struct {
+	Value string
+}
+
+func (this CurrencyValidator) Validate() (string, ValidationError) {
+	CurrencyPattern := ""
+	if Matched, Error := regexp.MatchString(CurrencyPattern, this.Value); Matched == false {
+		return "", Error
+	} else {
+		return this.Value, nil
+	}
+}
+
+type PriceValidator struct {
+	Value string
+}
+
+func (this PriceValidator) Validate() (string, ValidationError) {
+	PricePattern := ""
+	if Matched, Error := regexp.MatchString(PricePattern, this.Value); Matched == false {
+		return "", Error
+	} else {
+		return this.Value, nil
+	}
+}
+
+/// Models ...
+
 var customer *Customer
 var product *Product
 var cart *Cart
@@ -51,8 +96,8 @@ func init() {
 	WarnLogger = log.New(LogFile, "WARNING: ", log.Ldate|log.Ltime|log.Lshortfile)
 }
 
-func NewBaseModel(Model *gorm.DB){
-	return 
+func NewBaseModel(Model *gorm.DB) {
+	return
 }
 
 type BaseModel interface {
@@ -78,6 +123,7 @@ func init() {
 
 type Product struct {
 	gorm.Model
+
 	OwnerId            string
 	Owner              *Customer `gorm:"foreignKey: Customer;references:OwnerId"`
 	ProductName        string    `gorm:"VARCHAR(100) NOT NULL"`
@@ -86,30 +132,119 @@ type Product struct {
 	Currency           string    `gorm:"VARCHAR(10) NOT NULL"`
 }
 
-func (this *Product) Create(ObjectData map[string]interface{}) *Product {
+// Create Controller...
 
-}
-func (this *Product) Update(ObjId string, UpdatedData map[string]interface{}) bool {
+func (this *Product) Create(
 
+	ObjectData struct {
+		ProductName        string
+		ProductDescription string
+		OwnerId            string
+	},
+
+	PriceCredentials struct {
+		ProductPrice string
+		Currency     string
+	},
+
+) *Product {
+
+	Validators := []BaseValidator{
+		PriceValidator{Value: PriceCredentials.ProductPrice},
+		CurrencyValidator{Value: PriceCredentials.Currency},
+	}
+
+	// Validated Price Credentials...
+
+	ValidatedPrice, PriceError := Validators[0].Validate()
+	ValidatedCurrency, CurrencyError := Validators[1].Validate()
+
+	if PriceError != nil || CurrencyError != nil {
+		return nil
+	}
+
+	ValidatedPriceCredentials := map[string]string{
+		"Price":    ValidatedPrice,
+		"Currency": ValidatedCurrency,
+	}
+
+	// Validating Other String Product Params...
+
+	for element, value := range reflection.Items(ObjectData) {
+		if len(element) == 0 || element == nil {
+			return nil
+		}
+	}
+
+	// Creates New Object...
+
+	newProduct := Product{
+		ProductName:        ObjectData.ProductName,
+		OwnerId:            ObjectData.OwnerId,
+		ProductDescription: ObjectData.ProductDescription,
+		ProductPrice:       ValidatedPriceCredentials["Price"],
+		Currency:           ValidatedPriceCredentials["Currency"],
+	}
+
+	// Saving to the Database...
+
+	Saved := Database.Table("products").Save(&newProduct)
+	if Saved.Error != nil {
+		ErrorLogger.Println(fmt.Sprintf(
+			"Failed To Create Product. Reason: %s", Saved.Error))
+		return nil
+	}
+	return &newProduct
 }
+
+// Updating Controller...
+
+func (this *Product) Update(ObjId string,
+	UpdatedData struct {
+		ProductName        string
+		ProductDescription string
+	}) bool {
+
+	for element, value := range reflection.Items(UpdatedData) {
+		if len(value) == 0 || value == nil {
+			reflection.Remove(UpdatedData, element)
+		}
+	}
+
+	Updated := Database.Table("products").Where("id = ?", ObjId).Updates(UpdatedData)
+	if Updated.Error != nil {
+		return false
+	} else {
+		return true
+	}
+}
+
+// Deleting Controller...
 
 func (this *Product) Delete(ObjId string) bool {
-
+	Deleted := Database.Table("products").Delete("id = ?", ObjId)
+	if Deleted.Error != nil {
+		return false
+	} else {
+		return true
+	}
 }
 
 type Customer struct {
 	gorm.Model
+
 	Username          string `gorm:"VARCHAR(100) NOT NULL"`
 	Password          string `gorm:"VARCHAR(100) NOT NULL"`
 	Email             string `gorm:"VARCHAR(100) NOT NULL"`
 	ProductId         string
-	PurchasedProducts Product   `gorm:"foreignKey:Product;references:ProductId"`
+	PurchasedProducts []Product `gorm:"foreignKey:Product;references:ProductId"`
 	CreatedAt         time.Time `gorm:"DATE DEFAULT CURRENT DATE"`
 }
 
-func (this *Customer) Create(ObjectData map[string]interface{}) *Product {
+func (this *Customer) Create(ObjectData map[string]interface{}) *Customer {
 
 }
+
 func (this *Customer) Update(ObjId string, UpdatedData map[string]interface{}) bool {
 
 }
@@ -120,21 +255,47 @@ func (this *Customer) Delete(ObjId string) bool {
 
 type Cart struct {
 	gorm.Model
+
 	CustomerId string
 	ProductId  string
-	Owner      Customer `gorm:"foreignKey:Customer;references:CustomerId"`
-	Products   Product  `gorm:"foreignKey:Customer;references:ProductId"`
+	Owner      Customer  `gorm:"foreignKey:Customer;references:CustomerId"`
+	Products   []Product `gorm:"foreignKey:Customer;references:ProductId"`
 }
 
-func (this *Cart) Create(ObjectData map[string]interface{}) *Product {
+// Cart Create Controller ..
 
+func (this *Cart) Create(Customer *Customer, Products []Product) *Cart {
+	// Creating Cart....
+	newCart := Cart{Owner: *Customer, Products: Products}
+	Saved := Database.Table("carts").Save(&newCart)
+	if Saved.Error != nil {
+		return nil
+	} else {
+		return &newCart
+	}
 }
-func (this *Cart) Update(ObjId string, UpdatedData map[string]interface{}) bool {
 
+// Cart Update Controller...
+
+func (this *Cart) Update(ObjId string, UpdatedData struct{ Products []Product }) bool {
+	Updated := Database.Table("carts").Where("id = ?", ObjId).Updates(UpdatedData)
+	if Updated.Error != nil {
+		return false
+	} else {
+		return true
+	}
 }
+
+// Cart Delete Controller...
 
 func (this *Cart) Delete(ObjId string) bool {
-
+	Deleted := Database.Table("carts").Where(
+		"id = ?", ObjId).Delete("id = ?", ObjId)
+	if Deleted.Error != nil {
+		return false
+	} else {
+		return true
+	}
 }
 
 func CartOneOwnerConstraintTrigger() {
