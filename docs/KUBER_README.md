@@ -1,26 +1,19 @@
 # KUBERNETES PROJECT API DOCUMENTATION 
 
 --- 
-
-
 ## *Manifest Schema* 
 
 
 --- 
-
-
 ## *Requirements* 
 
 
 --- 
-
-
 ## *Usage* 
 
 
 
 --- 
-
 ## *External Links* 
 
 

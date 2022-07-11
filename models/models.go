@@ -341,7 +341,6 @@ func (this *Customer) Delete(ObjId string) bool {
 
 	Deleted := Database.Table("customers").Delete(ObjId)   // Deleting Customer But Without Committing Transaction..
 
-
 	group := sync.WaitGroup{}
 	channel := make(chan bool, 1000)
 

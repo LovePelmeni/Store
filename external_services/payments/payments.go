@@ -10,6 +10,7 @@ import (
 	"errors"
 	"reflection"
 	"strconv"
+	"sync"
 )
 
 
@@ -18,7 +19,7 @@ func getClient() *grpc.Client {}
 
 
 type PaymentInterface interface {
-	Pay(PaymentData map[string]interface{}) (bool, error)
+	Pay(PaymentData map[string]string) (bool, error)
 	Refund(PaymentId string) (*Refund, error)
 }
 
@@ -34,6 +35,10 @@ type PaymentInfoCredentials struct {
 	Price string 		`json:"Price"`
 }
 
+func (this *PaymentInfoCredentials) Validate() (bool, error){
+	return true, nil 
+}
+
 type PaymentCheckoutInfo struct {
 	sync.RWMutex 
 	
@@ -46,7 +51,7 @@ type PaymentCheckoutInfo struct {
 }
 
 
-func (this *Payment) Pay(PaymentCredentials PaymentInfoCredentials)  error {
+func (this *Payment) Pay(Client *grpc.Client, PaymentCredentials PaymentInfoCredentials)  error {
 
 
 	if valid := PaymentCredentials.Validate(); valid != nil {
@@ -134,11 +139,8 @@ func (this *Payment) Pay(PaymentCredentials PaymentInfoCredentials)  error {
 				    &checkoutParams.PaymentId))} else  {
 
 
-
-
 								// Processing Sending Email... About the Purchased Order.
 						go func (group *sync.WaitGroup, client *grpc.Client, channel chan struct{}, PaymentCredentials *Payment) {
-
 								group.Add(1)
 								
 						}()
