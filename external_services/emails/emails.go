@@ -56,11 +56,13 @@ type grpcEmailSenderInterface interface {
 	) (bool, error)
 }
 
-type grpcEmailSender struct{} // Implementation
+type GrpcEmailSender struct {
+	Client *grpcControllers.NewEmailClient
+} // Implementation
 
 // Overriden method for initializing gRPC Server Client.
 
-func (this *grpcEmailSender) getClient() (*grpcControllers.NewEmailClient, error) {
+func getClient() (*grpcControllers.NewEmailClient, error) {
 
 	Connection, Error := grpc.Dial("%s:%s",
 		GRPC_SERVER_HOST, GRPC_SERVER_PORT)
@@ -70,19 +72,14 @@ func (this *grpcEmailSender) getClient() (*grpcControllers.NewEmailClient, error
 
 // Method for sending out default Emails without any concrete topic.
 
-func (this *grpcEmailSender) SendDefaultEmail(customerEmail string, message string) (bool, error) {
+func (this *GrpcEmailSender) SendDefaultEmail(customerEmail string, message string) (bool, error) {
 
 	EmailRequestCredentials := grpcControllers.EmailDefaultParams{
 		CustomerEmail: customerEmail,
 		Message:       message,
 	}
 
-	client, ClientError := this.getClient()
-	if ClientError != nil {
-		panic(
-			"Failed to Create GRPC Client. Check for the Server Running...")
-	}
-	response, ResponseError := client.SendEmail(EmailRequestCredentials)
+	response, ResponseError := this.Client.SendEmail(EmailRequestCredentials)
 
 	if ResponseError != nil {
 		return false, exceptions.FailedRequest(
@@ -93,17 +90,14 @@ func (this *grpcEmailSender) SendDefaultEmail(customerEmail string, message stri
 
 // Method For sending Order Accepted Emails...
 
-func (this *grpcEmailSender) SendAcceptEmail(customerEmail string, message string) (bool, error) {
-	client, ClientError := this.getClient()
-	if ClientError != nil {
-		panic("Failed to Create GRPC Client.")
-	}
+func (this *GrpcEmailSender) SendAcceptEmail(customerEmail string, message string) (bool, error) {
+
 	RequestParams := grpcControllers.EmailOrderParams{
 		Status:        grpcControllers.STATUS_ACCEPTED,
 		message:       message,
 		CustomerEmail: customerEmail,
 	}
-	response, gRPCError := client.SendOrderEmail(RequestParams)
+	response, gRPCError := this.Client.SendOrderEmail(RequestParams)
 	if gRPCError != nil {
 		DebugLogger.Println("Failed to send Request")
 		return false, exceptions.FailedRequest(gRPCError)
@@ -113,16 +107,13 @@ func (this *grpcEmailSender) SendAcceptEmail(customerEmail string, message strin
 
 // Method for sending Order Rejected Emails...
 
-func (this *grpcEmailSender) SendRejectEmail(customerEmail string, message string) (bool, error) {
-	client, ClientError := this.getClient()
-	if ClientError != nil {
-		panic("Failed to create Client.")
-	}
+func (this *GrpcEmailSender) SendRejectEmail(customerEmail string, message string) (bool, error) {
+
 	RequestParams := grpcControllers.EmailOrderStatus{
 		Status:        grpcControllers.STATUS_REJECTED,
 		message:       message,
 		CustomerEmail: customerEmail,
 	}
-	response, ResponseError := client.SendOrderEmail(RequestParams)
+	response, ResponseError := this.Client.SendOrderEmail(RequestParams)
 	return response.Delivered, ResponseError
 }

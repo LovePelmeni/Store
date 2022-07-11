@@ -51,6 +51,10 @@ func init() {
 	WarnLogger = log.New(LogFile, "WARNING: ", log.Ldate|log.Ltime|log.Lshortfile)
 }
 
+func NewBaseModel(Model *gorm.DB){
+	return 
+}
+
 type BaseModel interface {
 	// ORM Model Interface with base Methods that every model need to have.
 	ApplyRestrictedFields() bool
@@ -62,7 +66,7 @@ type BaseModel interface {
 
 func init() {
 	// Applying Tables Constraints...
-	Models := []BaseModel{}
+	Models := []BaseModel{} // List of the Models...
 	for _, model := range Models {
 		if applied := model.ApplyRestrictedFields(); applied != true {
 			ErrorLogger.Println("Failed to Apply Orm Table Restrict Dependencies.")

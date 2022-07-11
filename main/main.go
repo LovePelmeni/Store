@@ -116,6 +116,7 @@ func main() {
 		router.GET("/liked/products/", products.GetMostLikedProducts)
 	}
 
+
 	DebugLogger.Println("Running HTTP Server.")
 	router.Run(fmt.Sprintf(":%s", APPLICATION_PORT))
 }

@@ -9,29 +9,34 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
-type BaseModelSuite struct {
-	suite.Suite
-	Controller       *gomock.Controller
-	Models           []models.BaseModel
-	MockedController *mocked_models.MockBaseModel
+
+func TestModelsCreate(t *testing.T) {
+	TestModelsData := []struct {
+		
+		ModelTestFunc func(t *testing.T) 
+	}{
+		
+	func(t *testing.T){models.Product},
+	func(t *testing.T){models.Cart}, 
+	func (t *testing.T) {models.Customer},
+	}
+
+	for _, test := range TestModelsData{
+		suite.Run(t, test.ModelTestFunc)
+	}
 }
 
-func (this *BaseModelSuite) SetupTest() {
-	this.Controller = gomock.NewController(this.T())
-	this.Models = []models.BaseModel{&models.product, &models.customer, &models.cart}
-	this.MockedController = mocked_models.NewMockBaseModel(this.Controller)
+func TestModelUpdate(t *testing.T) {
+	TestModelsData := []struct {
+		TestFunc func(t *testing.T)
+		UpdatedData map[string]interface{}
+	}{}
 }
 
-func (this *BaseModelSuite) TeardownTest() {
-	this.Controller.Finish()
+func TestModelsDelete(t *testing.T){
+	TestModelsData := []struct {
+		TestFunc func(t *testing.T) 
+		ObjId string
+	}
 }
 
-func TestBaseModelSuite(t *testing.T) {
-	suite.Run(t, new(BaseModelSuite))
-}
-
-func (this *BaseModelSuite) CreateModel() {}
-
-func (this *BaseModelSuite) UpdateModel() {}
-
-func (this *BaseModelSuite) DeleteModel() {}
