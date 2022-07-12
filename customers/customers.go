@@ -2,14 +2,14 @@ package customers
 
 import (
 	"log"
+	"net/http"
 	"os"
 	"reflection"
 	"time"
 
-	"github.com/LovePelmeni/OnlineStore/StoreService/customers/exceptions"
+	"github.com/LovePelmeni/OnlineStore/StoreService/authentication"
 	"github.com/LovePelmeni/OnlineStore/StoreService/models"
 	"github.com/gin-gonic/gin"
-	"gorm.io/gorm/clause"
 )
 
 var (
@@ -33,40 +33,48 @@ func init() {
 //go:generate mockgen -destination=mocks/customer.go --build_flags=--mod=mod . CustomerInterface
 type CustomerInterface interface {
 	// Interface for Managing Customer Model
-	CreateCustomer(customerData map[string]interface{}) (bool, error)
-	UpdateCustomer(customerId string, UpdatedData ...map[string]interface{}) (bool, error)
-	DeleteCustomer(customerId string) (bool, error)
+	CreateCustomer(customerData map[string]interface{})
+	UpdateCustomer(customerId string, UpdatedData ...map[string]interface{})
+	DeleteCustomer(customerId string)
 }
 
 type CustomerStruct struct{}
 
-func generateJwt(
-	customerUsername string, customerEmail string) (string, error) {
-	return "", nil
-}
+var customer = &Customer{}
 
-func (this *CustomerStruct) createCustomer(RequestContext *gin.Context, customerData struct {
-	Username string
-	Email    string
-	Password string
-},
-) (*models.Customer, error) {
+func (this *CustomerStruct) createCustomer(RequestContext *gin.Context) {
 	// Creates Customer
-	newCustomer := models.Customer{
-		Username: customerData.Username,
-		Password: customerData.Password,
-		Email:    customerData.Email,
+
+	NonSpecifiedFields := []string{}
+	for Property, Value := range reflection.Items(models.Customer) {
+		if Value := RequestContext.PostForm(Property); len(Value) == 0 {
+			result := append(NonSpecifiedFields, Property)
+			NonSpecifiedFields = result
+		} else {
+			continue
+		}
 	}
 
-	SavedModel := models.Database.Save(&newCustomer)
-	if SavedModel.Error != nil {
-		ErrorLogger.Println("Failed to Create Customer")
+	if len(NonSpecifiedFields) != 0 {
+		ErrorStatus := http.StatusBadRequest
+		RequestContext.JSON(ErrorStatus,
+			gin.H{"NonSpecifiedField": NonSpecifiedFields})
 	}
 
-	jwtToken, JwtError := generateJwt(customerData.Username, customerData.Email)
-	if JwtError != nil {
-		ErrorLogger.Println("Failed to generate JWT Token.")
+	newCustomerData := map[string]string{
+		"Username": RequestContext.PostForm("Username"),
+		"Email":    RequestContext.PostForm("Email"),
+		"Password": RequestContext.PostForm("Password"),
 	}
+
+	NewCustomer := customer.CreateCustomer(newCustomerData)
+	if NewCustomer == nil {
+		RequestContext.JSON(http.StatusNotImplemented,
+			gin.H{"error": "Failed to Create Customer."})
+	}
+
+	jwtToken := authentication.CreateJwtToken(
+		NewCustomer.Username, NewCustomer.Email)
 
 	CookieAgeTime := 10000 * time.Minute
 	RequestContext.SetCookie(
@@ -74,61 +82,53 @@ func (this *CustomerStruct) createCustomer(RequestContext *gin.Context, customer
 		"", "", true, false)
 
 	DebugLogger.Println("Customer has been created Successfully.")
-	return &newCustomer, nil
+	RequestContext.JSON(http.StatusOK, gin.H{"customer": NewCustomer})
+
 }
 
-func (this *CustomerStruct) updateCustomer(customerId string,
-	updatedData struct {
-		ValidUsername string
-		ValidPassword string
-	}) (bool, error) {
+func (this *CustomerStruct) updateCustomer(context *gin.Context) {
 	// Updates Customer
 
-	MappedItems, error := reflection.Items(updatedData)
-	ValidatedData := map[string]string{}
+	customerId := context.Query("customerId")
+	MappedItems, error := reflection.Items(customer)
 
 	for element, value := range MappedItems {
-		if valid := value != nil && len(value) != 0; valid != false {
-			ValidatedData[element] = value
+		if EmptyValue := context.PostForm(element); len(EmptyValue) == 0 {
+			context.Request.PostForm.Del(element)
 		} else {
-			return false, exceptions.ValidationError()
+			continue
 		}
 	}
 
-	models.Database.Clauses(clause.Locking{
-		Strength: "ON UPDATE",
-		Table:    clause.Table{Name: "customers"}})
+	updatedCustomerData := map[string]string{
+		"Password": context.PostForm("Password")}
 
-	customer := models.Database.Table("customers").Where(
-		"id = ?", customerId).Updates(ValidatedData)
-	if customer.Error != nil {
-		ErrorLogger.Println("Failed to Update Customer Profile.")
-		return false, exceptions.UpdateFailure()
+	updatedCustomer, error := customer.UpdateObject(customerId, updatedCustomerData)
+
+	if updatedCustomer == nil {
+		context.JSON(
+			http.StatusNotImplemented, gin.H{"error": error})
 	}
-	return true, nil
+
+	context.JSON(http.StatusCreated, nil)
 }
 
-func (this *CustomerStruct) deleteCustomer(
-	RequestContext *gin.Context, CustomerId string) (bool, error) {
+func (this *CustomerStruct) deleteCustomer(RequestContext *gin.Context) {
 	// Deletes Customer
 
-	models.Database.Clauses(clause.Locking{ // Locking Table In Order to prevent some operation while Profile is Deleting...
-		Strength: "ON UPDATE",
-		Table:    clause.Table{Name: "customers"}})
+	if HasJwt, error := RequestContext.Request.Cookie(
+		"jwt-token"); HasJwt != nil && error == nil {
 
-	deletedCustomer := models.Database.Table(
-		"customers").Delete("id", CustomerId)
-
-	if deletedCustomer.Error != nil {
-		ErrorLogger.Println("Failed To Delete Customer")
-		return false, exceptions.DeleteFailure(
-			deletedCustomer.Error.Error())
-	}
-
-	if HasJwt, error := RequestContext.Request.Cookie("jwt-token"); HasJwt != nil && error == nil {
 		HasJwt.MaxAge = -1 // Forcing Cookie To Expire Right Now...
 	} else {
 		InfoLogger.Println("No Jwt Token has been found for customer. Looks Like It Expired.")
 	}
-	return true, nil
+
+	customerId := RequestContext.Query("customerId")
+	deleted := customer.DeleteObject(customerId)
+
+	if deleted != true {
+		RequestContext.JSON(http.StatusNotImplemented, nil)
+	}
+	RequestContext.JSON(http.StatusCreated, nil)
 }

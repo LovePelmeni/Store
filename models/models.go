@@ -248,7 +248,7 @@ type Customer struct {
 	CreatedAt         time.Time `gorm:"DATE DEFAULT CURRENT DATE";`
 }
 
-func (this *Customer) Create(ObjectData struct{Username string; Password string; 
+func (this *Customer) CreateObject(ObjectData struct{Username string; Password string; 
 Email string; ProductId string; PurchasedProducts []Product; CreatedAt time.Time}) *Customer {
 
 	newCustomer := Customer{
@@ -325,7 +325,7 @@ Email string; ProductId string; PurchasedProducts []Product; CreatedAt time.Time
 }
 
 
-func (this *Customer) Update(ObjId string, UpdatedData struct{Password string}) bool {
+func (this *Customer) UpdateObject(ObjId string, UpdatedData struct{Password string}) bool {
 	Updated := Database.Table("customers").Updates(UpdatedData)
 	if Updated.Error != nil {ErrorLogger.Println(
 	"Failed To Update Customer."); return false}else{return true}
@@ -333,7 +333,7 @@ func (this *Customer) Update(ObjId string, UpdatedData struct{Password string}) 
 
 
 
-func (this *Customer) Delete(ObjId string) bool {
+func (this *Customer) DeleteObject(ObjId string) bool {
 
 	LockedConstraint := Database.Clauses(clause.Locking{Strength: "EXCLUSIVE MODE", // Locking Table In Order to prevent any interactions with this User.
     Table: clause.Table{Name: "customers"}}).Where("id = ?", ObjId)

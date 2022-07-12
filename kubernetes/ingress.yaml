@@ -4,7 +4,7 @@ metadata:
   name: ingress-store-network 
   namespace: ingress-namespace 
 spec:
-  ingressClassName: nginx 
+  type: NodePort 
   tls:
     - hosts:
       - store.com

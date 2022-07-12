@@ -97,11 +97,26 @@ func (this *PaymentIntentSuite) TestCreatePaymentSession() {
 	this.MockedPaymentGRPCClientController.EXPECT().CreatePaymentSession(gomock.Eq(this.Client, PaymentSessionCredentials)).Return(true, nil).Times(1)
 	ActualResponse, error := this.Payment.StartPaymentSession(PaymentSessionCredentials) 
 	ExpectedResponse, error := true, nil 
-	assert.Equal(ExpectedResponse, ActualResponse)
+	assert.Equal(this.T(), ExpectedResponse, ActualResponse)
 	assert.NoError(error)
 }
 
 
 func (this *PaymentIntentSuite) TestFailCreatePaymentSession(){
-
+	PaymentSessionCredentials := payments.PaymentSessionCredentials{
+		CustomerId: "1",
+		ProductId: "2",
+		Currency: "USD",
+		Price: "5.00",
+	}
+	ResponseError := errors.New("Response Error")
+	this.MockedPaymentGRPCClientController.EXPECT().CreatePaymentSession(gomock.Eq(
+	PaymentSessionCredentials)).Return(nil, ResponseError).Times(1)
+	ActualResponse, error := this.PaymentController.CreatePaymentSession(PaymentSessionCredentials) 
+	assert.Equal(this.T(), ActualResponse, nil)
+	assert.Equal(this.T(), ResponseError, error)
 }
+
+
+
+
