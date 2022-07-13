@@ -27,9 +27,9 @@ var (
 	WarnLogger  *log.Logger
 )
 
-var customer Customer 
-var product Product 
-var cart Cart 
+var customer Customer
+var product Product
+var cart Cart
 
 var (
 	POSTGRES_USER     = os.Getenv("POSTGRES_USER")
@@ -49,11 +49,9 @@ var (
 	))
 )
 
-var ValidationError error
-
 type BaseValidator interface {
 	// Base Validator Interface ...
-	Validate() (string, ValidationError)
+	Validate() (string, error)
 }
 
 var (
@@ -67,7 +65,7 @@ type CurrencyValidator struct {
 	Value string
 }
 
-func (this CurrencyValidator) Validate() (string, ValidationError) {
+func (this CurrencyValidator) Validate() (string, error) {
 	CurrencyPattern := ""
 	if Matched, Error := regexp.MatchString(CurrencyPattern, this.Value); Matched == false {
 		return "", Error
@@ -80,7 +78,7 @@ type PriceValidator struct {
 	Value string
 }
 
-func (this PriceValidator) Validate() (string, ValidationError) {
+func (this PriceValidator) Validate() (string, error) {
 	PricePattern := ""
 	if Matched, Error := regexp.MatchString(PricePattern, this.Value); Matched == false {
 		return "", Error
@@ -90,7 +88,6 @@ func (this PriceValidator) Validate() (string, ValidationError) {
 }
 
 /// Models ...
-
 
 func init() {
 	LogFile, error := os.OpenFile("databaseLogs.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
@@ -129,15 +126,27 @@ func init() {
 	DebugLogger.Println("Constraints has been applied successfully.")
 }
 
+type OwnerCredentials struct {
+	CardNumber  string
+	FirstName   string
+	LastName    string
+	PhoneNumber string
+	Email       string
+}
+
+func (this *OwnerCredentials) Validate() {
+	Patterns := []string{} // list of regex patterns for the field data....
+}
+
 type Product struct {
 	gorm.Model
 
-	OwnerId            string
-	Owner              *Customer `gorm:"foreignKey: Customer;references:OwnerId"`
-	ProductName        string    `gorm:"VARCHAR(100) NOT NULL"`
-	ProductDescription string    `gorm:"VARCHAR(100) NOT NULL DEFAULT 'This Product Has No Description'"`
-	ProductPrice       string    `gorm:"NUMERIC(10, 5) NOT NULL"`
-	Currency           string    `gorm:"VARCHAR(10) NOT NULL"`
+	OwnerId                       string
+	SerializedBankCardCredentials OwnerCredentials `gorm:"VARCHAR(100) NOT NULL;"` // this Field Is Actually Going to be serialized into string...
+	ProductName                   string           `gorm:"VARCHAR(100) NOT NULL"`
+	ProductDescription            string           `gorm:"VARCHAR(100) NOT NULL DEFAULT 'This Product Has No Description'"`
+	ProductPrice                  string           `gorm:"NUMERIC(10, 5) NOT NULL"`
+	Currency                      string           `gorm:"VARCHAR(10) NOT NULL"`
 }
 
 // Create Controller...
@@ -251,7 +260,7 @@ type Customer struct {
 	Password          string `gorm:"VARCHAR(100) NOT NULL"`
 	Email             string `gorm:"VARCHAR(100) NOT NULL UNIQUE"`
 	ProductId         string
-	PurchasedProducts []Product `gorm:"foreignKey:Product;references:ProductId;DEFAULT NULL"`
+	PurchasedProducts []Product `gorm:"foreignKey:Product;references:ProductId;DEFAULT NULL;constraint:ON DELETE PROTECT;"`
 	CreatedAt         time.Time `gorm:"DATE DEFAULT CURRENT DATE"`
 }
 
@@ -413,8 +422,8 @@ type Cart struct {
 
 	CustomerId string
 	ProductId  string
-	Owner      Customer  `gorm:"foreignKey:Customer;references:CustomerId"`
-	Products   []Product `gorm:"foreignKey:Customer;references:ProductId"`
+	Owner      Customer  `gorm:"foreignKey:Customer;references:CustomerId;constraints: ON DELETE PROTECT;"`
+	Products   []Product `gorm:"foreignKey:Customer;references:ProductId;constraints:ON DELETE PROTECT;"`
 }
 
 // Cart Create Controller ..

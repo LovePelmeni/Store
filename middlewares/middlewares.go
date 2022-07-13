@@ -9,7 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func SetAuthHeaderMiddleware(context *gin.Context) gin.HandlerFunc {
+func SetAuthHeaderMiddleware() gin.HandlerFunc {
 
 	return func(context *gin.Context) {
 
@@ -23,7 +23,7 @@ func SetAuthHeaderMiddleware(context *gin.Context) gin.HandlerFunc {
 	}
 }
 
-func JwtAuthenticationMiddleware(context *gin.Context) gin.HandlerFunc {
+func JwtAuthenticationMiddleware() gin.HandlerFunc {
 
 	return func(context *gin.Context) {
 
@@ -41,7 +41,7 @@ func JwtAuthenticationMiddleware(context *gin.Context) gin.HandlerFunc {
 
 // Product Middlewares....
 
-func IsProductOwnerMiddleware(context *gin.Context) gin.HandlerFunc {
+func IsProductOwnerMiddleware() gin.HandlerFunc {
 
 	return func(context *gin.Context) {
 
@@ -52,7 +52,9 @@ func IsProductOwnerMiddleware(context *gin.Context) gin.HandlerFunc {
 		models.Database.Table(
 			"products").Where("id = ?", productId).First(&product)
 
-		if isOwner := strings.ToLower(product.Owner.Username); isOwner == strings.ToLower(requestCustomerId) { // if customer is not an owner...
+		if isOwner := strings.ToLower(
+		product.SerializedBankCardCredentials.FirstName);
+	    isOwner == strings.ToLower(requestCustomerId) { // if customer is not an owner...
 			return
 		}
 		context.Next()

@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/suite"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+	"github.com/stretchr/testify/assert"
 )
 
 type TestDatabaseConnection struct {
@@ -21,14 +22,14 @@ type TestDatabaseConnection struct {
 }
 
 var (
-	TEST_POSTGRES_HOST     = os.Getenv("")
-	TEST_POSTGRES_PORT     = os.Getenv("")
-	TEST_POSTGRES_USER     = os.Getenv("")
-	TEST_POSTGRES_PASSWORD = os.Getenv("")
-	TEST_POSTGRES_DATABASE = os.Getenv("")
+	TEST_POSTGRES_HOST     = os.Getenv("TEST_POSTGRES_HOST")
+	TEST_POSTGRES_PORT     = os.Getenv("TEST_POSTGRES_PORT")
+	TEST_POSTGRES_USER     = os.Getenv("TEST_POSTGRES_USER")
+	TEST_POSTGRES_PASSWORD = os.Getenv("TEST_POSTGRES_PASSWORD")
+	TEST_POSTGRES_DATABASE = os.Getenv("TEST_POSTGRES_DATABASE")
 )
 
-func (this *TestDatabaseConnection) StartSession() *gorm.DB {
+func (this *TestDatabaseConnection) StartSession() (*gorm.DB) {
 	Database, error := gorm.Open(postgres.New(
 		postgres.Config{
 			DSN: fmt.Sprintf("host=%s port=%s dbname=%s user=%s password=%s",
@@ -39,7 +40,7 @@ func (this *TestDatabaseConnection) StartSession() *gorm.DB {
 	if error != nil {
 		panic("Testing Database is not running...!")
 	}
-	return Database
+	return Database, nil 
 }
 
 type ModelSuite struct {
@@ -78,11 +79,24 @@ func TestModelSuite(t *testing.T) {
 
 func (this *ModelSuite) TestModelsCreate(t *testing.T) {
 
-	testProductCase := func(t *testing.T) {}
+	databaseConnection := this.TestDatabaseConnection.StartSession()
 
-	testCustomerCase := func(t *testing.T) {}
 
-	testCartCase := func(t *testing.T) {}
+	// Creation Models Test Cases Goes There...
+
+
+	// Products 
+	testProductCase := func(t *testing.T) {newProduct := models.Product{}; 
+	Saved := databaseConnection.Table("products").Save(&newProduct); assert.Equal(t, Saved.Error, nil)}
+
+	// Customers 
+	testCustomerCase := func(t *testing.T) {newCustomer := models.Customer{};
+    Saved := databaseConnection.Table("customers").Save(&newCustomer); assert.Equal(t, Saved.Error, nil)}
+
+	// Carts
+	testCartCase := func(t *testing.T) {newCart := models.Cart{};
+    Saved := databaseConnection.Table("carts").Save(&newCart); assert.Equal(t, Saved.Error, nil)}
+
 
 	testing.RunTests(func(pt string, str string) (bool, error) {
 		return true, nil
@@ -104,7 +118,6 @@ func (this *ModelSuite) TestModelUpdate(t *testing.T) {
 	testing.RunTests(func(pat string, str string) (bool, error) {
 		return true, nil
 	},
-
 		[]testing.InternalTest{
 			{"Test Update Customer", testCustomerCase},
 			{"Test Update Product", testProductCase},

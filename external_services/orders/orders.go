@@ -1,71 +1,102 @@
 package orders
 
 import (
-	"time"
-
-	"github.com/"
-	"github.com/LovePelmeni/OnlineStore/StoreService/models"
-	"github.com/go-kit/kit/transport/amqp"
-	amqp_server "github.com/streadway/amqp"
+	"context"
+	"fmt"
+	"log"
+	"os"
 )
 
 var (
-	RabbitmqHost = os.Getenv("RABBITMQ_HOST")
-	RabbitmqPort = os.Getenv("RABBITMQ_PORT")
-	RabbitmqUser = os.Getenv("RABBITMQ_USER")
-	RabbitmqPassword = os.Getenv("RABBITMQ_PASSWORD")
-	RabbitmqVhost = os.Getenv("RABBITMQ_VHOST")
+	FIREBASE_DATABASE_NAME = os.Getenv("FIREBASE_DATABASE_NAME")
+	FIREBASE_DATABASE_URL  = fmt.Sprintf("https://%s.firebaseio.com")
 )
 
-type RabbitmqTransportInterface interface{
+var (
+	DebugLogger   *log.Logger
+	ErrorLogger   *log.Logger
+	InfoLogger    *log.Logger
+	WarningLogger *log.Logger
+)
 
-	Connect(credentials *RabbitmqCredentials) *amqp_server.Channel 
-	Disconnect() (bool, error)
+func init() {
 
-	CreateQueue(QueueName string) (bool, error) 
-	RemoteQueue(QueueName string) (bool, error)
+	LogFile, Exception := os.OpenFile("firebase_order.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
+	if Exception != nil {
+		panic(Exception)
+	}
 
-	PublishEvent(BodyData map[string]interface{}, RoutingKey string) (bool, error)
-	ListenEvent(ResponseHandler func(Queue string, 
-	Method string, Props map[string]interface{}, Body []byte)) (bool, error)
-}
-type RabbitmqTransport struct {
-
-}
-func (this *RabbitmqTransport) Connect(credentials *RabbitmqCredentials) {
-	// Connection Method.. Uses AMQP Protocol for Connection.
-	ConnectionURI := url.URL(fmt.Sprintf("amqp://%s:%s@%s:%s/%s", RabbitmqUser, RabbitmqPassword,
-    RabbitmqHost, RabbitmqPort, RabbitmqVhost))
-	ConnectionChannel, error := amqp_server.Dial(ConnectionURI)
-
-	if error != nil {ErrorLogger.Println("Connection Failed, Check If Server Running.")}
-	Channel, err := ConnectionChannel.Channel()
-	if err != nil {ErrorLogger.Println("Failed To Initialize Connection Channel.")}
-	return Channel 
+	DebugLogger = log.New(LogFile, "DEBUG: ", log.Ldate|log.Llongfile|log.Ltime)
+	InfoLogger = log.New(LogFile, "INFO: ", log.Ldate|log.Llongfile|log.Ltime)
+	ErrorLogger = log.New(LogFile, "ERROR: ", log.Ldate|log.Llongfile|log.Ltime)
 }
 
-func NewOrder(credentials *OrderStruct) *RabbitmqTransportInterface {
-	return RabbitmqTransportInterface{}{}
+// Abstractions for the `Orders` Bounded Context...
+
+type FirebaseInitializerInterface interface {
+	// Interfaces for Application Intialization..
+	// Requires all necessary method to be overridden, in order to provide availability
+	InitializeFirebaseApplication()
+	InitializeFirebaseDatabase()
 }
 
-
-type OrderInterface interface {
-	// Interface 
-	CreateOrder(credentials map[string]string) (bool, error)
-	CancelOrder(OrderId string) (bool, error)
+type FirebaseOrderControllerInterface interface {
+	// Interface, that is responsible for Managing `Orders` Real Time Database..
+	// Provides Methods for Creating / Deleting Documents.
+	CreateFirebaseOrderTransaction(OrderParams OrderCredentialsInterface) (bool, error)
+	DeleteFirebaseOrderTransaction(OrderId string) (bool, error)
 }
 
-type OrderStruct struct {
-	OrderInfo struct{OrderName string; PurchaserId string; 
-	Goods []models.Product; TotalPrice string}
-	CreatedAt time.Time 
+type OrderCredentialsInterface interface {
+	// Interface Responsible for Initial Info About the Order..
+	Validate(Credentials struct{}) (bool, error)
 }
 
-
-func ProcessOrder(order *OrderInterface) error {
-	// Method That Processing Order Initialization....
+type OrderControllerInterface interface {
+	// Interface that represents the Main Controller Responsible For Handling Any Operations,
+	// Related to the `Orders`
+	CreateOrder(OrderCredentials OrderCredentialsInterface) (bool, error)
 }
 
-func ProcessCancelOrder(order *OrderInterface) error {
+type FirebaseInitializer struct{}
 
+// Firebase Application Initializer, Contains Method For Initializing Firebase Abstractions...
+
+func (this *FirebaseInitializer) InitializeFirebaseDatabase(
+	DatabaseName string, Application *firebase.App) *firebase.Database {
+	// Method Initializes database collection ..
+	newDatabase := Application.Database(DatabaseName)
+	return &newDatabase
 }
+
+func (this *FirebaseInitializer) InitializeFirebaseApplication() *firebase.App {
+
+	// Method Initializes Firebase Database ...
+	context := context.Background()
+	config := &firebase.Config{
+		DATABASE_URL: FIREBASE_DATABASE_URL,
+	}
+	newApp, InitializeError := firebase.NewApp(context, config)
+	if InitializeError != nil {
+		ErrorLogger.Println(
+			"Failed to Initialize Application.")
+		panic(InitializeError)
+	}
+	return &newApp
+}
+
+type FirebaseOrderController struct{}
+
+func (this *FirebaseOrderController) CreateFirebaseOrderTransaction() {}
+
+func (this *FirebaseOrderController) DeleteFirebaseOrderTransaction() {}
+
+type OrderController struct{}
+
+func (this *OrderController) CreateOrder(OrderCredentials OrderCredentialsInterface) (bool, error) {}
+
+func (this *OrderController) CancelOrder(OrderId string) (bool, error) {}
+
+type OrderCredentials struct{}
+
+func (this *OrderCredentials) Validate(Credentials struct{}) (bool, error) {}

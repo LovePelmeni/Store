@@ -13,6 +13,7 @@ import (
 	"github.com/LovePelmeni/OnlineStore/StoreService/products"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"github.com/gorilla/csrf"
 )
 
 var (
@@ -43,7 +44,7 @@ func init() {
 		&models.Cart{},
 	)
 	if Failed != nil {
-		panic(fmt.Sprintf("Failed To Auto Migrate, Error: %s"))
+		panic(fmt.Sprintf("Failed To Auto Migrate, Error: %s", Failed.Error))
 	}
 	LogFile, error := os.OpenFile("Main.log", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0666)
 	if error != nil {
@@ -76,6 +77,11 @@ func main() {
 		AllowFiles:       true,
 	}))
 
+
+	// CSRF Goes there. 
+
+	Protection := csrf.Protect([]byte("some-authentication-key"))
+
 	// HEALTHCHECK
 
 	router.GET("/healthcheck/", func(context *gin.Context) {
@@ -83,7 +89,8 @@ func main() {
 	})
 
 	// CUSTOMERS
-	router.Use(middlewares.SetAuthHeaderMiddleware, middlewares.JwtAuthenticationMiddleware)
+	router.Use(middlewares.SetAuthHeaderMiddleware(),
+    middlewares.JwtAuthenticationMiddleware())
 	{
 		router.GET("get/profile/:customerId/", customers.GetCustomerProfile)   // Is Authenticated
 		router.POST("create/customer/", customers.CreateCustomer)              // AllowAny
@@ -94,15 +101,15 @@ func main() {
 	// PRODUCTS
 
 	// Getter Endpoints.
-	router.Group("retrieve/").Use(middlewares.SetAuthHeaderMiddleware)
+	router.Group("retrieve/").Use(middlewares.SetAuthHeaderMiddleware())
 	{
 		router.GET("all/products/:productId", products.GetProductsCatalog)
 		router.GET("product/:productId", products.GetProduct)
 	}
 
 	// CUD Endpoints.
-	router.Group("product/").Use(middlewares.SetAuthHeaderMiddleware, 
-	middlewares.JwtAuthenticationMiddleware, middlewares.IsProductOwnerMiddleware)
+	router.Group("product/").Use(middlewares.SetAuthHeaderMiddleware(), 
+	middlewares.JwtAuthenticationMiddleware(), middlewares.IsProductOwnerMiddleware())
 	{ // Is Authenticated
 		router.POST("create/", products.CreateProduct)             // permission for creating products requires.
 		router.PUT("update/:productId", products.UpdateProduct)    // permission for own this product
@@ -110,7 +117,7 @@ func main() {
 	}
 
 	// Most ... Products.
-	router.Group("get/most/").Use(middlewares.SetAuthHeaderMiddleware)
+	router.Group("get/most/").Use(middlewares.SetAuthHeaderMiddleware())
 	{
 		router.GET("/popular/week/products", products.GetTopWeekProducts) // AllowAny
 		router.GET("/liked/products/", products.GetMostLikedProducts)
@@ -118,5 +125,5 @@ func main() {
 
 
 	DebugLogger.Println("Running HTTP Server.")
-	router.Run(fmt.Sprintf(":%s", APPLICATION_PORT))
+	http.ListenAndServe(fmt.Sprintf("%s:%s", APPLICATION_PORT), Protection(router))
 }
