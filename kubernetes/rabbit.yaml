@@ -2,7 +2,7 @@ apiVersion: v1
 kind: StatefulSet
 metadata:
   name: rabbitmq-server 
-  namespace: rabbit_namespace 
+  namespace: rabbit-namespace 
 
 spec:
   terminationGracePeriodSeconds: 10 

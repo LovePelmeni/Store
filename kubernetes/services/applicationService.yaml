@@ -5,6 +5,8 @@ metadata:
   namespace: ingress_namespace 
 spec:
   type: ClusterIP 
+  externalIPs:
+    - 192.268.0.10 
   selector:
     matchLabels:
       app: store_entrypoint 

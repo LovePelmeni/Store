@@ -3,19 +3,18 @@ kind: Deployment
 
 metadata:
   name: store-application-server
-  namespace: store_namespace 
+  namespace: store-namespace 
   labels: 
     app: store-application-server
 
 spec:
-  hostname: store_application 
   selector:
     matchLabels:  
-      app: store-application-server
+      app: store-entrypoint
   template:
     metadata:
       labels: 
-        app: store_entrypoint 
+        app: store-entrypoint 
     spec:
       containers:
         - name: store_application 
@@ -34,14 +33,19 @@ spec:
             limits:
               cpu: "0.7"
               memory: "4Gi"
-          hostNetwork: true 
-          dnsPolicy: Default
+
+          # Variables that will determine right server credentials,
+          # in order to make a healthcheck with right ip and port credentials.
+          env:
+            - name: APPLICATION_IP_ADDRESS 
+              value: metadata.nodeIp
+
+            - name: APPLICATION_PORT
+              value: spec.template.spec.containers.ports[0].port
 
           livenessProbe:
-            httpGet:
-              path: /healthcheck/
-              protocol: HTTP 
-              port: 8005 
+            exec:
+              command: ["curl", "-f", "http://$()"]
               startPeriod: 30s 
               initialSeconds: 10
       

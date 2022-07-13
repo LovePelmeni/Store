@@ -8,11 +8,10 @@ import (
 	"time"
 
 	"context"
-	"json"
 	"reflection"
 	"regexp"
 
-	grpcCustomers "github.com/LovePelmeni/OnlineStore/grpc/customers"
+	grpcCustomers "github.com/LovePelmeni/OnlineStore/Payment-Service/grpc/customers"
 
 	"sync"
 
@@ -27,6 +26,11 @@ var (
 	ErrorLogger *log.Logger
 	WarnLogger  *log.Logger
 )
+
+var customer Customer 
+var product Product 
+var cart Cart 
+
 var (
 	POSTGRES_USER     = os.Getenv("POSTGRES_USER")
 	POSTGRES_PASSWORD = os.Getenv("POSTGRES_PASSWORD")
@@ -87,9 +91,6 @@ func (this PriceValidator) Validate() (string, ValidationError) {
 
 /// Models ...
 
-var customer *Customer
-var product *Product
-var cart *Cart
 
 func init() {
 	LogFile, error := os.OpenFile("databaseLogs.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
@@ -141,7 +142,7 @@ type Product struct {
 
 // Create Controller...
 
-func (this *Product) Create(
+func (this *Product) CreateObject(
 
 	ObjectData struct {
 		ProductName        string
@@ -197,16 +198,18 @@ func (this *Product) Create(
 
 	Saved := Database.Table("products").Save(&newProduct)
 	if Saved.Error != nil {
+		Saved.Rollback()
 		ErrorLogger.Println(fmt.Sprintf(
 			"Failed To Create Product. Reason: %s", Saved.Error))
 		return nil
 	}
+	Saved.Commit()
 	return &newProduct
 }
 
 // Updating Controller...
 
-func (this *Product) Update(ObjId string,
+func (this *Product) UpdateObject(ObjId string,
 	UpdatedData struct {
 		ProductName        string
 		ProductDescription string
@@ -220,19 +223,23 @@ func (this *Product) Update(ObjId string,
 
 	Updated := Database.Table("products").Where("id = ?", ObjId).Updates(UpdatedData)
 	if Updated.Error != nil {
+		Updated.Rollback()
 		return false
 	} else {
+		Updated.Commit()
 		return true
 	}
 }
 
 // Deleting Controller...
 
-func (this *Product) Delete(ObjId string) bool {
+func (this *Product) DeleteObject(ObjId string) bool {
 	Deleted := Database.Table("products").Delete("id = ?", ObjId)
 	if Deleted.Error != nil {
+		Deleted.Rollback()
 		return false
 	} else {
+		Deleted.Commit()
 		return true
 	}
 }
@@ -245,47 +252,58 @@ type Customer struct {
 	Email             string `gorm:"VARCHAR(100) NOT NULL UNIQUE"`
 	ProductId         string
 	PurchasedProducts []Product `gorm:"foreignKey:Product;references:ProductId;DEFAULT NULL"`
-	CreatedAt         time.Time `gorm:"DATE DEFAULT CURRENT DATE";`
+	CreatedAt         time.Time `gorm:"DATE DEFAULT CURRENT DATE"`
 }
 
-func (this *Customer) CreateObject(ObjectData struct{Username string; Password string; 
-Email string; ProductId string; PurchasedProducts []Product; CreatedAt time.Time}) *Customer {
+func (this *Customer) CreateObject(ObjectData struct {
+	Username          string
+	Password          string
+	Email             string
+	ProductId         string
+	PurchasedProducts []Product
+	CreatedAt         time.Time
+}) *Customer {
 
 	newCustomer := Customer{
-		Username: ObjectData.Username, 
-		Password: ObjectData.Password, 
-		Email: ObjectData.Email, 
+		Username:          ObjectData.Username,
+		Password:          ObjectData.Password,
+		Email:             ObjectData.Email,
 		PurchasedProducts: []Product{},
 	}
 
-
-	Saved := Database.Table("customers").Save(&newCustomer) 
+	Saved := Database.Table("customers").Save(&newCustomer)
 	if Saved.Error != nil {
-	SavePoint := Saved.SavePoint()
-	}else{return false} // Making Save Point or returns Failure 
+		Saved.Rollback()
+		return nil
+	} else {
+		Saved.SavePoint("Pre-Saved")
+	} // Making Save Point or returns Failure
 
-
-	// Sending 
+	// Sending
 
 	group := sync.WaitGroup{}
 	channel := make(chan bool, 10000)
 
-	go func (channel chan bool, CustomerInfo *Customer) {
+	go func(channel chan bool, CustomerInfo *Customer) {
 
-		
 		group.Add(1)
-		client, CreationError := grpcCustomers.NewCustomerClient() 
-		if CreationError != nil {log.Fatal("Failed To Create Customer.")}
+		client, CreationError := grpcCustomers.NewCustomerClient()
+		if CreationError != nil {
+			log.Fatal("Failed To Create Customer.")
+		}
 
-
-		RequestContext, CancelError := context.WithTimeout(context.Background(), 10 * time.Second)
+		RequestContext, CancelError := context.WithTimeout(context.Background(), 10*time.Second)
 		CustomerParams := grpcCustomers.CustomerParams{
 			Username: CustomerInfo.Username,
 		}
 
 		response, error := client.CreateCustomer(RequestContext, CustomerParams)
-		if response.Created != true || error != nil {channel <- false}else{channel <- true}
-		 // Notifying about Customer Creation Status...
+		if response.Created != true || error != nil {
+			channel <- false
+		} else {
+			channel <- true
+		}
+		// Notifying about Customer Creation Status...
 
 		defer CancelError()
 		group.Done()
@@ -295,61 +313,59 @@ Email string; ProductId string; PurchasedProducts []Product; CreatedAt time.Time
 	group.Wait()
 
 	select {
-		case data := <- channel: 
-			close(channel) // Closing Channel After Receiving the Data....
-			var Status struct{Created bool}
-		
-			json.Decoder(data).Decode(&Status) // Decoding the Creation Status...
-			if created := Status.Created; created != false {
+	case Status := <-channel:
+		close(channel) // Closing Channel After Receiving the Data....
 
-				DebugLogger.Println("Customer Has been Created Successfully.")
-				if Saved.Error != nil{ErrorLogger.Println("Failed to Create Local Customer." +
-				"While Remote `Payment` One Has already been, Aborting..."); return nil}
-				Saved.Commit() // Commiting Transaction ..
-				return &newCustomer 
+		if created := Status; created != false {
 
-			}else {ErrorLogger.Println(
-			"Failed to Create Payment Remote Profile for the Customer. Aborting Transaction.")
+			DebugLogger.Println("Customer Has been Created Successfully.")
+			if Saved.Error != nil {
+				ErrorLogger.Println("Failed to Create Local Customer." +
+					"While Remote `Payment` One Has already been, Aborting...")
+				return nil
+			}
+			Saved.Commit() // Commiting Transaction ..
+			return &newCustomer
+
+		} else {
+			ErrorLogger.Println(
+				"Failed to Create Payment Remote Profile for the Customer. Aborting Transaction.")
 			Saved.Rollback() // Rollbacking the transaction...
-			return nil 
+			return nil
 		}
-		default:
-			close(channel) // Closing Channel..
-			ErrorLogger.Println("Failed to Receive Channel Request.")
-			return nil 
+	default:
+		close(channel) // Closing Channel..
+		ErrorLogger.Println("Failed to Receive Channel Request.")
+		return nil
 	}
-
-	Saved := Database.Table("customers").Save(&newCustomer)
-	if Saved.Error != nil {ErrorLogger.Println("Failed to Create Customer.")}
-
 }
 
-
-func (this *Customer) UpdateObject(ObjId string, UpdatedData struct{Password string}) bool {
+func (this *Customer) UpdateObject(ObjId string, UpdatedData struct{ Password string }) bool {
 	Updated := Database.Table("customers").Updates(UpdatedData)
-	if Updated.Error != nil {ErrorLogger.Println(
-	"Failed To Update Customer."); return false}else{return true}
+	if Updated.Error != nil {
+		ErrorLogger.Println(
+			"Failed To Update Customer.")
+		return false
+	} else {
+		return true
+	}
 }
-
-
 
 func (this *Customer) DeleteObject(ObjId string) bool {
 
-	LockedConstraint := Database.Clauses(clause.Locking{Strength: "EXCLUSIVE MODE", // Locking Table In Order to prevent any interactions with this User.
-    Table: clause.Table{Name: "customers"}}).Where("id = ?", ObjId)
+	Database.Clauses(clause.Locking{Strength: "EXCLUSIVE MODE", // Locking Table In Order to prevent any interactions with this User.
+		Table: clause.Table{Name: "customers"}}).Where("id = ?", ObjId)
 
-
-	Deleted := Database.Table("customers").Delete(ObjId)   // Deleting Customer But Without Committing Transaction..
+	Deleted := Database.Table("customers").Delete(ObjId) // Deleting Customer But Without Committing Transaction..
 
 	group := sync.WaitGroup{}
 	channel := make(chan bool, 1000)
 
-
-	go func(channel chan bool, ObjId string) { // Deleting Payment Customer Profile Using GRPC Protobuf 
+	go func(channel chan bool, ObjId string) { // Deleting Payment Customer Profile Using GRPC Protobuf
 
 		group.Add(1)
 		client := grpcCustomers.NewCustomerClient()
-		RequestContext, CancelError := context.WithTimeout(context.Background(), 10 * time.Second)
+		RequestContext, CancelError := context.WithTimeout(context.Background(), 10*time.Second)
 
 		CustomerDeleteParams := grpcCustomers.CustomerDeleteParams{ // GRPC Request Params...
 			CustomerId: ObjId,
@@ -357,37 +373,40 @@ func (this *Customer) DeleteObject(ObjId string) bool {
 
 		Response, Error := client.DeleteCustomer(RequestContext, CustomerDeleteParams) // Sending GRPC Request to Delete The Customer...
 		if HasBeenDeleted := Response.Deleted; HasBeenDeleted == true && Error == nil {
-		channel <- true}else{channel <- false}
+			channel <- true
+		} else {
+			channel <- false
+		}
 
 		defer CancelError()
 		group.Done()
 
 	}(channel, ObjId)
 
-
 	group.Wait()
-
 
 	select {
 
-		case data := <- channel:
+	case Status := <-channel:
 
-			close(channel)
-			var Status struct{Deleted bool}
-			json.Decoder(data).Decode(&Status)
+		close(channel)
 
-			if Status.Deleted != true {ErrorLogger.Println(
-			"Failed to Delete Customer with ID:" + ObjId); Deleted.Rollback(); return false} else {
-				Deleted.Commit()
-			}
+		if Status != true {
+			ErrorLogger.Println(
+				"Failed to Delete Customer with ID:" + ObjId)
+			Deleted.Rollback()
+			return false
+		} else {
+			Deleted.Commit()
+			return true
+		}
 
-		default:
-			close(channel)
-			ErrorLogger.Println("Response via Channel Has been Lost, Aborting..")	
-			return false 
+	default:
+		close(channel)
+		ErrorLogger.Println("Response via Channel Has been Lost, Aborting..")
+		return false
+	}
 }
-
-
 
 type Cart struct {
 	gorm.Model
@@ -400,7 +419,7 @@ type Cart struct {
 
 // Cart Create Controller ..
 
-func (this *Cart) Create(Customer *Customer, Products []Product) *Cart {
+func (this *Cart) CreateObject(Customer *Customer, Products []Product) *Cart {
 	// Creating Cart....
 	newCart := Cart{Owner: *Customer, Products: Products}
 	Saved := Database.Table("carts").Save(&newCart)
@@ -415,7 +434,7 @@ func (this *Cart) Create(Customer *Customer, Products []Product) *Cart {
 
 // Cart Update Controller...
 
-func (this *Cart) Update(ObjId string, UpdatedData struct{ Products []Product }) bool {
+func (this *Cart) UpdateObject(ObjId string, UpdatedData struct{ Products []Product }) bool {
 	Updated := Database.Table("carts").Where("id = ?", ObjId).Updates(UpdatedData)
 	if Updated.Error != nil {
 		Updated.Rollback()
@@ -428,7 +447,7 @@ func (this *Cart) Update(ObjId string, UpdatedData struct{ Products []Product })
 
 // Cart Delete Controller...
 
-func (this *Cart) Delete(ObjId string) bool {
+func (this *Cart) DeleteObject(ObjId string) bool {
 	Deleted := Database.Table("carts").Where(
 		"id = ?", ObjId).Delete("id = ?", ObjId)
 	if Deleted.Error != nil {
@@ -462,7 +481,3 @@ func CartOneOwnerConstraintTrigger() {
 	Database.Exec(command)
 	DebugLogger.Println("Unique Constraint Has Been Integrated.")
 }
-
-
-
-

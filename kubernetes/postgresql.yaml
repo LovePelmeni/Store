@@ -3,7 +3,7 @@ kind: StatefulSet
 
 metadata:
   app: store-postgresql-database 
-  namespace: store_namespace 
+  namespace: store-namespace 
 
 spec:
   template:
@@ -14,7 +14,7 @@ spec:
       replicas: 3 
       containers:
         - name: postgresql_database 
-          image: postgres:latest 
+          image: postgres
           env:
             - name: POSTGRES_DB 
               valueFrom:
