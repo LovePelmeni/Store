@@ -48,4 +48,4 @@ spec:
               command: ["curl", "-f", "http://$(APPLICATION_IP_ADDRESS):$(APPLICATION_PORT)"]
               startPeriod: 30s 
               initialSeconds: 10
-      
+    
