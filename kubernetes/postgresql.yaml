@@ -11,7 +11,6 @@ spec:
       app: postgres_application 
     
     spec:
-      replicas: 3 
       containers:
         - name: postgresql_database 
           image: postgres

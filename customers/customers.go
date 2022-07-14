@@ -1,14 +1,15 @@
 package customers
 
 import (
+	"encoding/json"
 	"log"
 	"net/http"
 	"os"
-	"reflection"
 	"time"
 
 	"github.com/LovePelmeni/OnlineStore/StoreService/authentication"
-	"github.com/LovePelmeni/OnlineStore/StoreService/models"
+	models "github.com/LovePelmeni/OnlineStore/StoreService/models"
+	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
 )
 
@@ -38,11 +39,9 @@ type CustomerInterface interface {
 	DeleteCustomer(customerId string)
 }
 
-type CustomerStruct struct{}
+var customer models.Customer
 
-var customer = &Customer{}
-
-func (this *CustomerStruct) createCustomer(RequestContext *gin.Context) {
+func CreateCustomerRestController(RequestContext *gin.Context) {
 	// Creates Customer
 
 	NonSpecifiedFields := []string{}
@@ -61,13 +60,19 @@ func (this *CustomerStruct) createCustomer(RequestContext *gin.Context) {
 			gin.H{"NonSpecifiedField": NonSpecifiedFields})
 	}
 
-	newCustomerData := map[string]string{
-		"Username": RequestContext.PostForm("Username"),
-		"Email":    RequestContext.PostForm("Email"),
-		"Password": RequestContext.PostForm("Password"),
+	newCustomerData := struct {
+		Username  string
+		Password  string
+		Email     string
+		CreatedAt time.Time
+	}{
+		Username:  RequestContext.PostForm("Username"),
+		Email:     RequestContext.PostForm("Email"),
+		Password:  RequestContext.PostForm("Password"),
+		CreatedAt: time.Now(),
 	}
 
-	NewCustomer := customer.CreateCustomer(newCustomerData)
+	NewCustomer := customer.CreateObject(newCustomerData, nil, []models.Product{})
 	if NewCustomer == nil {
 		RequestContext.JSON(http.StatusNotImplemented,
 			gin.H{"error": "Failed to Create Customer."})
@@ -86,7 +91,7 @@ func (this *CustomerStruct) createCustomer(RequestContext *gin.Context) {
 
 }
 
-func (this *CustomerStruct) updateCustomer(context *gin.Context) {
+func UpdateCustomerRestController(context *gin.Context) {
 	// Updates Customer
 
 	customerId := context.Query("customerId")
@@ -100,12 +105,12 @@ func (this *CustomerStruct) updateCustomer(context *gin.Context) {
 		}
 	}
 
-	updatedCustomerData := map[string]string{
-		"Password": context.PostForm("Password")}
+	updatedCustomerData := struct{ Password string }{
+		Password: context.PostForm("Password"),
+	}
+	updatedCustomer := customer.UpdateObject(customerId, updatedCustomerData)
 
-	updatedCustomer, error := customer.UpdateObject(customerId, updatedCustomerData)
-
-	if updatedCustomer == nil {
+	if updatedCustomer == false {
 		context.JSON(
 			http.StatusNotImplemented, gin.H{"error": error})
 	}
@@ -113,7 +118,7 @@ func (this *CustomerStruct) updateCustomer(context *gin.Context) {
 	context.JSON(http.StatusCreated, nil)
 }
 
-func (this *CustomerStruct) deleteCustomer(RequestContext *gin.Context) {
+func DeleteCustomerRestController(RequestContext *gin.Context) {
 	// Deletes Customer
 
 	if HasJwt, error := RequestContext.Request.Cookie(
@@ -131,4 +136,46 @@ func (this *CustomerStruct) deleteCustomer(RequestContext *gin.Context) {
 		RequestContext.JSON(http.StatusNotImplemented, nil)
 	}
 	RequestContext.JSON(http.StatusCreated, nil)
+}
+
+func GetCustomerProfileRestController(context *gin.Context) {
+
+	var customerRef models.Customer
+
+	jwtToken, NotFound := context.Request.Cookie("jwt-token")
+	if NotFound != nil {
+		DebugLogger.Println("Jwt Token not found...")
+		context.JSON(http.StatusForbidden, nil)
+	}
+
+	DecodedStructure := struct {
+		jwt.StandardClaims
+		Username string
+		Email    string
+	}{}
+
+	ParsedToken, JwtError := jwt.ParseWithClaims(jwtToken.String(), DecodedStructure,
+		func(token *jwt.Token) (interface{}, error) {
+			return []byte(os.Getenv("JWT-SECRET-KEY")), nil
+		})
+	_ = ParsedToken
+
+	if JwtError != nil {
+		DebugLogger.Println("Invalid Jwt Token Passed.")
+		context.JSON(http.StatusForbidden, nil)
+	}
+
+	customer := models.Database.Table("customers").Where(
+		"username = ?", DecodedStructure.Username).First(&customerRef)
+	if customer.Error != nil {
+		context.JSON(http.StatusNotFound, nil)
+	}
+
+	jsonSerializedCustomer, EncodeError := json.Marshal(customerRef)
+	if EncodeError != nil {
+		context.JSON(http.StatusNotImplemented, nil)
+	}
+
+	context.JSON(http.StatusOK, gin.H{"customerProfile": string(
+		jsonSerializedCustomer[:len(jsonSerializedCustomer)])})
 }

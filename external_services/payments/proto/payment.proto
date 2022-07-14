@@ -1,6 +1,8 @@
 syntax = "proto3";
 package payments;
 
+option go_package = "https://github.com/LovePelmeni/Store/StoreService/external_services/payments/proto";
+
 service PaymentIntent {
   rpc CreatePaymentIntent(PaymentIntentParams) returns (PaymentIntentResponse);
 }

@@ -7,10 +7,10 @@ import (
 
 	"github.com/LovePelmeni/OnlineStore/StoreService/models"
 	"github.com/golang/mock/gomock"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
-	"github.com/stretchr/testify/assert"
 )
 
 type TestDatabaseConnection struct {
@@ -29,7 +29,7 @@ var (
 	TEST_POSTGRES_DATABASE = os.Getenv("TEST_POSTGRES_DATABASE")
 )
 
-func (this *TestDatabaseConnection) StartSession() (*gorm.DB) {
+func (this *TestDatabaseConnection) StartSession() *gorm.DB {
 	Database, error := gorm.Open(postgres.New(
 		postgres.Config{
 			DSN: fmt.Sprintf("host=%s port=%s dbname=%s user=%s password=%s",
@@ -40,7 +40,7 @@ func (this *TestDatabaseConnection) StartSession() (*gorm.DB) {
 	if error != nil {
 		panic("Testing Database is not running...!")
 	}
-	return Database, nil 
+	return Database
 }
 
 type ModelSuite struct {
@@ -81,22 +81,28 @@ func (this *ModelSuite) TestModelsCreate(t *testing.T) {
 
 	databaseConnection := this.TestDatabaseConnection.StartSession()
 
-
 	// Creation Models Test Cases Goes There...
 
+	// Products
+	testProductCase := func(t *testing.T) {
+		newProduct := models.Product{}
+		Saved := databaseConnection.Table("products").Save(&newProduct)
+		assert.Equal(t, Saved.Error, nil)
+	}
 
-	// Products 
-	testProductCase := func(t *testing.T) {newProduct := models.Product{}; 
-	Saved := databaseConnection.Table("products").Save(&newProduct); assert.Equal(t, Saved.Error, nil)}
-
-	// Customers 
-	testCustomerCase := func(t *testing.T) {newCustomer := models.Customer{};
-    Saved := databaseConnection.Table("customers").Save(&newCustomer); assert.Equal(t, Saved.Error, nil)}
+	// Customers
+	testCustomerCase := func(t *testing.T) {
+		newCustomer := models.Customer{}
+		Saved := databaseConnection.Table("customers").Save(&newCustomer)
+		assert.Equal(t, Saved.Error, nil)
+	}
 
 	// Carts
-	testCartCase := func(t *testing.T) {newCart := models.Cart{};
-    Saved := databaseConnection.Table("carts").Save(&newCart); assert.Equal(t, Saved.Error, nil)}
-
+	testCartCase := func(t *testing.T) {
+		newCart := models.Cart{}
+		Saved := databaseConnection.Table("carts").Save(&newCart)
+		assert.Equal(t, Saved.Error, nil)
+	}
 
 	testing.RunTests(func(pt string, str string) (bool, error) {
 		return true, nil

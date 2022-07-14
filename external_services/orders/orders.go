@@ -5,6 +5,11 @@ import (
 	"fmt"
 	"log"
 	"os"
+
+	"time"
+
+	firebase "firebase.google.com/go"
+	"firebase.google.com/go/db"
 )
 
 var (
@@ -17,6 +22,14 @@ var (
 	ErrorLogger   *log.Logger
 	InfoLogger    *log.Logger
 	WarningLogger *log.Logger
+)
+
+// Firebase RealTime Database Credentials..
+
+var (
+	StorageBucketID  = os.Getenv("STORAGE_BUCKET_ID")
+	ProjectID        = os.Getenv("PROJECT_ID")
+	ServiceAccountID = os.Getenv("SERVICE_ACCOUNT_ID")
 )
 
 func init() {
@@ -43,7 +56,8 @@ type FirebaseInitializerInterface interface {
 type FirebaseOrderControllerInterface interface {
 	// Interface, that is responsible for Managing `Orders` Real Time Database..
 	// Provides Methods for Creating / Deleting Documents.
-	CreateFirebaseOrderTransaction(OrderParams OrderCredentialsInterface) (bool, error)
+	CreateFirebaseOrderTransaction(OrderParams OrderCredentialsInterface,
+		DatabaseInstance *FirebaseInitializer) (bool, error)
 	DeleteFirebaseOrderTransaction(OrderId string) (bool, error)
 }
 
@@ -63,10 +77,15 @@ type FirebaseInitializer struct{}
 // Firebase Application Initializer, Contains Method For Initializing Firebase Abstractions...
 
 func (this *FirebaseInitializer) InitializeFirebaseDatabase(
-	DatabaseName string, Application *firebase.App) *firebase.Database {
+	DatabaseName string, Application *firebase.App) *db.Client {
 	// Method Initializes database collection ..
-	newDatabase := Application.Database(DatabaseName)
-	return &newDatabase
+	Context, TimeoutError := context.WithTimeout(context.Background(), 10*time.Second)
+	newDatabase, DatabaseError := Application.Database(Context)
+	if DatabaseError != nil {
+		ErrorLogger.Println("Failed to Initialize Database...")
+	}
+	defer TimeoutError()
+	return newDatabase
 }
 
 func (this *FirebaseInitializer) InitializeFirebaseApplication() *firebase.App {
@@ -74,7 +93,10 @@ func (this *FirebaseInitializer) InitializeFirebaseApplication() *firebase.App {
 	// Method Initializes Firebase Database ...
 	context := context.Background()
 	config := &firebase.Config{
-		DATABASE_URL: FIREBASE_DATABASE_URL,
+		DatabaseURL:      FIREBASE_DATABASE_URL,
+		ProjectID:        ProjectID,
+		StorageBucket:    StorageBucketID,
+		ServiceAccountID: ServiceAccountID,
 	}
 	newApp, InitializeError := firebase.NewApp(context, config)
 	if InitializeError != nil {
@@ -82,7 +104,7 @@ func (this *FirebaseInitializer) InitializeFirebaseApplication() *firebase.App {
 			"Failed to Initialize Application.")
 		panic(InitializeError)
 	}
-	return &newApp
+	return newApp
 }
 
 type FirebaseOrderController struct{}

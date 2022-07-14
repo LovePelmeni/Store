@@ -17,7 +17,7 @@ import (
 )
 
 var (
-	APPLICATION_HOST = os.Getenv("APPLICATION_HOST")
+	APPLICATION_HOST = "localhost"
 	APPLICATION_PORT = os.Getenv("APPLICATION_PORT")
 
 	EMAIL_APPLICATION_HOST = os.Getenv("EMAIL_APPLICATION_HOST")
@@ -35,6 +35,7 @@ var (
 )
 
 func init() {
+
 	// Initializing API Servers...
 
 	// Migrating into Postgresql
@@ -43,8 +44,9 @@ func init() {
 		&models.Customer{},
 		&models.Cart{},
 	)
+
 	if Failed != nil {
-		panic(fmt.Sprintf("Failed To Auto Migrate, Error: %s", Failed.Error))
+		panic(fmt.Sprintf("Failed To Auto Migrate, Error: %s", Failed.Error()))
 	}
 	LogFile, error := os.OpenFile("Main.log", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0666)
 	if error != nil {
@@ -77,8 +79,7 @@ func main() {
 		AllowFiles:       true,
 	}))
 
-
-	// CSRF Goes there. 
+	// CSRF Goes there.
 
 	Protection := csrf.Protect([]byte("some-authentication-key"))
 
@@ -90,12 +91,12 @@ func main() {
 
 	// CUSTOMERS
 	router.Use(middlewares.SetAuthHeaderMiddleware(),
-    middlewares.JwtAuthenticationMiddleware())
+		middlewares.JwtAuthenticationMiddleware())
 	{
-		router.GET("get/profile/:customerId/", customers.GetCustomerProfile)   // Is Authenticated
-		router.POST("create/customer/", customers.CreateCustomer)              // AllowAny
-		router.PUT("update/customer/:customerId", customers.UpdateCustomer)    // Is Authenticated
-		router.DELETE("delete/customer/:customerId", customers.DeleteCustomer) // Is Authenticated
+		router.GET("get/profile/:customerId/", customers.GetCustomerProfileRestController)   // Is Authenticated
+		router.POST("create/customer/", customers.CreateCustomerRestController)              // AllowAny
+		router.PUT("update/customer/:customerId", customers.UpdateCustomerRestController)    // Is Authenticated
+		router.DELETE("delete/customer/:customerId", customers.DeleteCustomerRestController) // Is Authenticated
 	}
 
 	// PRODUCTS
@@ -108,8 +109,8 @@ func main() {
 	}
 
 	// CUD Endpoints.
-	router.Group("product/").Use(middlewares.SetAuthHeaderMiddleware(), 
-	middlewares.JwtAuthenticationMiddleware(), middlewares.IsProductOwnerMiddleware())
+	router.Group("product/").Use(middlewares.SetAuthHeaderMiddleware(),
+		middlewares.JwtAuthenticationMiddleware(), middlewares.IsProductOwnerMiddleware())
 	{ // Is Authenticated
 		router.POST("create/", products.CreateProduct)             // permission for creating products requires.
 		router.PUT("update/:productId", products.UpdateProduct)    // permission for own this product
@@ -123,7 +124,7 @@ func main() {
 		router.GET("/liked/products/", products.GetMostLikedProducts)
 	}
 
-
 	DebugLogger.Println("Running HTTP Server.")
-	http.ListenAndServe(fmt.Sprintf("%s:%s", APPLICATION_PORT), Protection(router))
+	http.ListenAndServe(fmt.Sprintf("%s:%s",
+		APPLICATION_HOST, APPLICATION_PORT), Protection(router))
 }

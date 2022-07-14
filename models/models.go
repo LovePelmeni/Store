@@ -142,7 +142,7 @@ type Product struct {
 	gorm.Model
 
 	OwnerId                       string
-	SerializedBankCardCredentials OwnerCredentials `gorm:"VARCHAR(100) NOT NULL;"` // this Field Is Actually Going to be serialized into string...
+	SerializedBankCardCredentials OwnerCredentials `gorm:"VARCHAR(100) NOT NULL;"`
 	ProductName                   string           `gorm:"VARCHAR(100) NOT NULL"`
 	ProductDescription            string           `gorm:"VARCHAR(100) NOT NULL DEFAULT 'This Product Has No Description'"`
 	ProductPrice                  string           `gorm:"NUMERIC(10, 5) NOT NULL"`
@@ -256,22 +256,20 @@ func (this *Product) DeleteObject(ObjId string) bool {
 type Customer struct {
 	gorm.Model
 
-	Username          string `gorm:"VARCHAR(100) NOT NULL UNIQUE"`
-	Password          string `gorm:"VARCHAR(100) NOT NULL"`
-	Email             string `gorm:"VARCHAR(100) NOT NULL UNIQUE"`
+	Username          string `gorm:"VARCHAR(100) NOT NULL UNIQUE";json:"Username"`
+	Password          string `gorm:"VARCHAR(100) NOT NULL";json:"Password"`
+	Email             string `gorm:"VARCHAR(100) NOT NULL UNIQUE";json:"Email"`
 	ProductId         string
-	PurchasedProducts []Product `gorm:"foreignKey:Product;references:ProductId;DEFAULT NULL;constraint:ON DELETE PROTECT;"`
-	CreatedAt         time.Time `gorm:"DATE DEFAULT CURRENT DATE"`
+	PurchasedProducts []Product `gorm:"foreignKey:Product;references:ProductId;DEFAULT NULL;constraint:ON DELETE PROTECT;";json:"PurchasedProducts"`
+	CreatedAt         time.Time `gorm:"DATE DEFAULT CURRENT DATE";json:"CreatedAt"`
 }
 
 func (this *Customer) CreateObject(ObjectData struct {
-	Username          string
-	Password          string
-	Email             string
-	ProductId         string
-	PurchasedProducts []Product
-	CreatedAt         time.Time
-}) *Customer {
+	Username  string
+	Password  string
+	Email     string
+	CreatedAt time.Time
+}, PurchasedProducts ...[]Product) *Customer {
 
 	newCustomer := Customer{
 		Username:          ObjectData.Username,
@@ -422,8 +420,8 @@ type Cart struct {
 
 	CustomerId string
 	ProductId  string
-	Owner      Customer  `gorm:"foreignKey:Customer;references:CustomerId;constraints: ON DELETE PROTECT;"`
-	Products   []Product `gorm:"foreignKey:Customer;references:ProductId;constraints:ON DELETE PROTECT;"`
+	Owner      Customer  `gorm:"foreignKey:Customer;references:CustomerId;constraints: ON DELETE PROTECT;";json:"Owner"`
+	Products   []Product `gorm:"foreignKey:Customer;references:ProductId;constraints:ON DELETE PROTECT;";json:"Products"`
 }
 
 // Cart Create Controller ..

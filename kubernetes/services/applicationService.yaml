@@ -4,7 +4,9 @@ metadata:
   name: applicationService 
   namespace: ingress_namespace 
 spec:
-  type: ClusterIP 
+  selector:
+    - name: store-entrypoint
+  type: LoadBalancer 
   externalIPs:
     - 192.268.0.10 
   selector:
@@ -12,5 +14,5 @@ spec:
       app: store_entrypoint 
   ports:
     - name: store-application-server
-      targetPort: 8005 # port of the Nginx Web Server for the applicaiton.
+      targetPort: 8010
       port: 8010 # port of the Service

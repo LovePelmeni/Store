@@ -37,10 +37,6 @@ func JwtDecodeError() error {
 	return errors.New("Failed to Decode JWT Token.")
 }
 
-func init() {
-
-}
-
 type JwtToken struct {
 	jwt.StandardClaims
 
@@ -95,5 +91,3 @@ func CheckValidJwtToken(token string) error {
 	}
 	return nil
 }
-
-
