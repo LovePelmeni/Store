@@ -155,8 +155,8 @@ type OrderController struct {
 	FirebaseManager *firebase.FirebaseDatabaseOrderManager // for managing orders...
 }
 
-func NewOrderController() *OrderController {
-	return &OrderController{}
+func NewOrderController(FirebaseOrderManager *firebase.FirebaseDatabaseOrderManager) *OrderController {
+	return &OrderController{FirebaseManager: FirebaseOrderManager}
 }
 
 func (this *OrderController) CreateOrder(OrderCredentials OrderCredentialsInterface) (bool, error) {

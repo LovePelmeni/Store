@@ -80,6 +80,7 @@ func init() {
 
 // Abstractions...
 
+//go:generate mockgen generate -destination=StoreService/mocks/firebase.go
 type FirebaseConfigInterface interface {
 	// Configuration of the Firebase Real Time Database...
 	// Parameters:
@@ -92,6 +93,7 @@ type FirebaseConfigInterface interface {
 	// }
 }
 
+//go:generate mockgen generate -destination=StoreService/mocks/firebase.go
 type FirebaseInitializerInterface interface {
 	// Interface for Initialization Firebase Entities, such as Database, DatabaseCollection, App
 	InitializeFirebaseApplication() (*firebase.App, error)
@@ -99,6 +101,7 @@ type FirebaseInitializerInterface interface {
 	InitializeFirebaseCollection(CollectionName string) (*db.Ref, error)
 }
 
+//go:generate mockgen generate -destination=StoreService/mocks/firebase.go
 type FirebaseDatabaseOrderManagerInterface interface {
 	// Interface for Managing `Order` Collection in Firebase Real Time Database
 	CreateOrder(OrderCredentials *orders.OrderCredentialsInterface) (bool, error)
