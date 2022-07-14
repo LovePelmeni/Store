@@ -56,6 +56,12 @@ type PaymentInfoCredentialsInterface interface {
 	Validate() (map[string]string, error)
 }
 
+type PaymentSessionInterface interface {
+}
+
+type PaymentIntentInterface interface {
+}
+
 type PaymentCheckoutInterface interface {
 	FormCheckout() //
 }

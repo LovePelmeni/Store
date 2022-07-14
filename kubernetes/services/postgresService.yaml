@@ -7,7 +7,7 @@ spec:
   type: ClusterIP
   selector:
     matchLabels:
-      app: postgres_application 
+      app: postgres-application 
   ports:
     - name: store-postgresql-database 
       port: 5435 # Port of this Service 

@@ -1,20 +1,14 @@
 package orders
 
 import (
-	"context"
-	"fmt"
 	"log"
 	"os"
 
-	"time"
+	"errors"
+	"sync"
 
-	firebase "firebase.google.com/go"
-	"firebase.google.com/go/db"
-)
-
-var (
-	FIREBASE_DATABASE_NAME = os.Getenv("FIREBASE_DATABASE_NAME")
-	FIREBASE_DATABASE_URL  = fmt.Sprintf("https://%s.firebaseio.com")
+	"github.com/LovePelmeni/OnlineStore/StoreService/external_services/orders/firebase"
+	"github.com/LovePelmeni/OnlineStore/StoreService/models"
 )
 
 var (
@@ -32,93 +26,159 @@ var (
 	ServiceAccountID = os.Getenv("SERVICE_ACCOUNT_ID")
 )
 
-func init() {
+func InitializeLoggers() (bool, error) {
 
-	LogFile, Exception := os.OpenFile("firebase_order.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
+	LogFile, Exception := os.OpenFile("order.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
 	if Exception != nil {
-		panic(Exception)
+		return false, Exception
 	}
 
 	DebugLogger = log.New(LogFile, "DEBUG: ", log.Ldate|log.Llongfile|log.Ltime)
 	InfoLogger = log.New(LogFile, "INFO: ", log.Ldate|log.Llongfile|log.Ltime)
 	ErrorLogger = log.New(LogFile, "ERROR: ", log.Ldate|log.Llongfile|log.Ltime)
+	return true, nil
 }
 
-// Abstractions for the `Orders` Bounded Context...
+func init() {
 
-type FirebaseInitializerInterface interface {
-	// Interfaces for Application Intialization..
-	// Requires all necessary method to be overridden, in order to provide availability
-	InitializeFirebaseApplication()
-	InitializeFirebaseDatabase()
+	Initialized, Error := InitializeLoggers()
+	if !Initialized && Error != nil {
+		panic(Error)
+	}
+
 }
 
-type FirebaseOrderControllerInterface interface {
-	// Interface, that is responsible for Managing `Orders` Real Time Database..
-	// Provides Methods for Creating / Deleting Documents.
-	CreateFirebaseOrderTransaction(OrderParams OrderCredentialsInterface,
-		DatabaseInstance *FirebaseInitializer) (bool, error)
-	DeleteFirebaseOrderTransaction(OrderId string) (bool, error)
-}
+// Abstractions...
 
+//go:generate mockgen generate -destination=Storeservice/mocks/orders.go . OrderCredentialsInterface
 type OrderCredentialsInterface interface {
+
 	// Interface Responsible for Initial Info About the Order..
-	Validate(Credentials struct{}) (bool, error)
+	// Requires Following Structure To Be passed as a Order Credentials:
+
+	Validate() (bool, error)
+	GetCredentials() (OrderCredentialsInterface, error)
 }
 
+//go:generate -destination=StoreService/mocks/orders.go . OrderControllerInterface
 type OrderControllerInterface interface {
 	// Interface that represents the Main Controller Responsible For Handling Any Operations,
 	// Related to the `Orders`
 	CreateOrder(OrderCredentials OrderCredentialsInterface) (bool, error)
+	CancelOrder(OrderId string) (bool, error)
 }
 
-type FirebaseInitializer struct{}
+// Implementations...
 
-// Firebase Application Initializer, Contains Method For Initializing Firebase Abstractions...
+type OrderCredentials struct {
+	mutex sync.RWMutex
 
-func (this *FirebaseInitializer) InitializeFirebaseDatabase(
-	DatabaseName string, Application *firebase.App) *db.Client {
-	// Method Initializes database collection ..
-	Context, TimeoutError := context.WithTimeout(context.Background(), 10*time.Second)
-	newDatabase, DatabaseError := Application.Database(Context)
-	if DatabaseError != nil {
-		ErrorLogger.Println("Failed to Initialize Database...")
+	Credentials struct {
+		mutex            sync.RWMutex
+		OrderName        string
+		OrderDescription string
+
+		PurchasersInfo struct {
+			Purchaser *models.Customer
+		}
+
+		ProductsInfo struct {
+			Products         []*models.Product
+			TotalPrice       string
+			Currency         string
+			ProductsQuantity string
+		}
 	}
-	defer TimeoutError()
-	return newDatabase
 }
 
-func (this *FirebaseInitializer) InitializeFirebaseApplication() *firebase.App {
+func NewOrderCredentials(Credentials struct {
+	Credentials struct {
+		mutex            sync.RWMutex
+		OrderName        string
+		OrderDescription string
 
-	// Method Initializes Firebase Database ...
-	context := context.Background()
-	config := &firebase.Config{
-		DatabaseURL:      FIREBASE_DATABASE_URL,
-		ProjectID:        ProjectID,
-		StorageBucket:    StorageBucketID,
-		ServiceAccountID: ServiceAccountID,
+		PurchasersInfo struct {
+			Purchaser *models.Customer
+		}
+
+		ProductsInfo struct {
+			Products         []*models.Product
+			TotalPrice       string
+			Currency         string
+			ProductsQuantity string
+		}
 	}
-	newApp, InitializeError := firebase.NewApp(context, config)
-	if InitializeError != nil {
-		ErrorLogger.Println(
-			"Failed to Initialize Application.")
-		panic(InitializeError)
-	}
-	return newApp
+}) *OrderCredentials {
+	return &OrderCredentials{Credentials: Credentials}
 }
 
-type FirebaseOrderController struct{}
+func (this *OrderCredentials) Validate() error {
 
-func (this *FirebaseOrderController) CreateFirebaseOrderTransaction() {}
+	var ValidatedCustomersInfo interface{}
+	var ValidatedProductsInfo interface{}
 
-func (this *FirebaseOrderController) DeleteFirebaseOrderTransaction() {}
+	_ = ValidatedCustomersInfo
+	_ = ValidatedProductsInfo
 
-type OrderController struct{}
+	group := sync.WaitGroup{}
 
-func (this *OrderController) CreateOrder(OrderCredentials OrderCredentialsInterface) (bool, error) {}
+	// Validating Customer Info..
 
-func (this *OrderController) CancelOrder(OrderId string) (bool, error) {}
+	go func(CustomerCredentials ...this.Credentials) {
+		// If Data is valid it will put it into `ValidatedCustomersInfo`
+		group.Add(1)
 
-type OrderCredentials struct{}
+		group.Done()
+	}(this.Credentials)
 
-func (this *OrderCredentials) Validate(Credentials struct{}) (bool, error) {}
+	// Validating Products Info..
+	go func(ProductsCredentials ...this.Credentials) {
+
+		// If Data is Valid it will put it into `ValidatedProductsInfo`
+		group.Add(1)
+		group.Done()
+	}(this.Credentials)
+	return nil
+}
+
+func (this *OrderCredentials) GetCredentials() (*OrderCredentials, error) {
+	Error := this.Validate()
+	if Error != nil {
+		InfoLogger.Println(
+			"Invalid Order Credentials has been passed.")
+		return nil, errors.New("Invalid Credentials")
+	}
+	return this, nil
+}
+
+type OrderController struct {
+	FirebaseManager *firebase.FirebaseDatabaseOrderManager // for managing orders...
+}
+
+func NewOrderController() *OrderController {
+	return &OrderController{}
+}
+
+func (this *OrderController) CreateOrder(OrderCredentials OrderCredentialsInterface) (bool, error) {
+
+	OrderCredentials, Error := OrderCredentials.GetCredentials() // Validating Credentials First..
+	if Error != nil {
+		return false, Error
+	}
+
+	if Created, Error := this.FirebaseManager.CreateOrder(OrderCredentials); Created != true || Error != nil {
+		ErrorLogger.Println("Failed to Create Order.. Reason: " + Error.Error())
+		return false, Error
+	}
+	return true, nil
+}
+
+func (this *OrderController) CancelOrder(OrderId string) (bool, error) {
+
+	if Deleted, Error := this.FirebaseManager.CancelOrder(OrderId); Deleted != true || Error != nil {
+		ErrorLogger.Println("Failed to Cancel Order.. Reason: " + Error.Error())
+		return false, Error
+	} else {
+		return true, nil
+	}
+}

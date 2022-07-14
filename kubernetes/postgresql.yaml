@@ -7,12 +7,9 @@ metadata:
 
 spec:
   template:
-    metadata:
-      app: postgres_application 
-    
     spec:
       containers:
-        - name: postgresql_database 
+        - name: postgresql-database 
           image: postgres
           env:
             - name: POSTGRES_DB 
@@ -33,17 +30,17 @@ spec:
                   - name: postgres-config-map 
                     value: POSTGRES_PASSWORD 
           ports:
-            - containerPort: 5435 
+            - TargetPort: 5435 
+            - port: 5435 
+            - protocol: TCP 
           
           command: ["-p", "5435"]
-          dnsPolicy: Default 
-          hostNetwork: true  
 
           volumeMounts:
-            - mountPath: PostgresDataVolume 
-              path: var/lib/postgresql/data 
+            - mountPath: var/lib/postgres/data
+              name: PostgresDataVolume
 
-        volumes:
-          name: PostgresDataVolume
-          persistentVolumeClaim:
-            claimName: persistent-postgres-claim
+      volumes:
+        name: PostgresDataVolume
+        persistentVolumeClaim:
+          claimName: persistent-postgres-claim

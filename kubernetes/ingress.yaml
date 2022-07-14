@@ -15,6 +15,6 @@ spec:
       paths:
         path: "/"
         backend: 
-          serviceName: applicationService 
+          serviceName: store-application-service 
           servicePort: 8010
     

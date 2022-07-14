@@ -19,6 +19,7 @@ type PaymentIntentSuite struct {
 }
 
 func (this *PaymentIntentSuite) SetupTest() {
+
 	this.Controller = gomock.NewController(this.T())
 	this.MockedPaymentGRPCClientController = mock_payments.NewMockPaymentIntentClient(this.Controller, this.Payment)
 	this.Payment = &payments.PaymentInfoCredentials{
@@ -28,6 +29,7 @@ func (this *PaymentIntentSuite) SetupTest() {
 		Currency: "USD",
 		Price: "1.00",
 	}
+	this.PaymentIntentController = payments.PaymentIntentController{ }
 }
 
 func TestPaymentIntentSuite(t *testing.T) {

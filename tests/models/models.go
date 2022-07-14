@@ -50,9 +50,12 @@ type ModelSuite struct {
 	MockedModelInterface mock_models.NewMockBaseModel
 	ListModels           []models.BaseModel
 
-	ModelsTestCreationCasesData []struct{} // struct that represents Model Data Payload for Create Method
-	ModelsTestUpdateCasesData   []struct{} // struct that represents Model Data Payload for Update Method
-	ModelsTestDeleteCasesData   []struct{} // struct that represents Model Data Payload for Delete Method
+	ModelsTestCreationCasesData map[string]struct{ ObjectData interface{} } // struct that represents Model Data Payload for Create Method
+	ModelsTestUpdateCasesData   map[string]struct {
+		ObjectId    string
+		UpdatedData interface{}
+	} // struct that represents Model Data Payload for Update Method
+	ModelsTestDeleteCasesData map[string]struct{ ObjectId string } // struct that represents Model Data Payload for Delete Method
 
 	TestDatabaseConnection *TestDatabaseConnection
 }
@@ -62,11 +65,11 @@ func (this *ModelSuite) SetupTest() {
 	this.MockedModelInterface = mock_models.NewMockBaseModel(this.Controller)
 	this.ListModels = []models.BaseModel{&models.customer, &models.cart, &models.product}
 
-	this.ModelsTestCreationCasesData = []struct{}{}
+	this.ModelsTestCreationCasesData = nil
 
-	this.ModelsTestUpdateCasesData = []struct{}{}
+	this.ModelsTestUpdateCasesData = nil
 
-	this.ModelsTestDeleteCasesData = []struct{}{}
+	this.ModelsTestDeleteCasesData = nil
 }
 
 func (this *ModelSuite) TeardownTest() {
@@ -133,9 +136,27 @@ func (this *ModelSuite) TestModelUpdate(t *testing.T) {
 
 func (this *ModelSuite) TestModelsDelete(t *testing.T) {
 
-	testCustomerCase := func(t *testing.T) {}
-	testProductCase := func(t *testing.T) {}
-	testCartCase := func(t *testing.T) {}
+	var customer models.Customer
+	var product models.Product
+	var cart models.Cart
+
+	testCustomerCase := func(t *testing.T) {
+		customerId := this.ModelsTestDeleteCasesData["customers"]["customers"].ObjectId
+		deleted := customer.DeleteObject(customerId)
+		assert.Equal(t, deleted, true)
+	}
+
+	testProductCase := func(t *testing.T) {
+		productId := this.ModelTestDeleteCasesData["products"]["products"].ObjectId
+		deleted := product.DeleteObject(productId)
+		assert.Equal(t, deleted, true)
+	}
+
+	testCartCase := func(t *testing.T) {
+		cartId := this.ModelTestDeleteCasesData["carts"]["carts"].ObjectId
+		deleted := cart.DeleteObject(cartId)
+		assert.Equal(t, deleted, true)
+	}
 
 	testing.RunTests(func(pat string, str string) (bool, error) { return true, nil },
 		[]testing.InternalTest{

@@ -1,0 +1,45 @@
+pipeline {
+
+    agent any 
+    environment { 
+        API_VERSION="v1" // this version need to be specified within the commit... 
+    }
+
+    stages {
+
+        stage("build"){
+
+            steps{
+                sh "echo 'Running Build Pipeline'"
+                sh "echo 'docker build . --name=new_store_application_image'"
+                sleep 10 
+                echo "Docker Built Image Successfully! And Initial Tests Has been Passed. 
+                Going to the Testing Stage.."
+            }
+        }
+
+        stage("test"){
+            steps{
+                // checking for application health..
+                sh "echo 'Running Test Pipeline'"
+                sh "echo 'Running Healtcheck Test...'"
+                sh "echo 'curl -f http://$APPLICATION_HOST:$APPLICATION_PORT'"
+                sh "echo 'Application Health State Is Okay... Running Other Tests...'"
+                sh "echo 'All Tests Passed... Running Deployment Pipeline...'"
+            }
+        }
+
+        stage("deployment"){
+
+            steps{
+                sh "echo 'Running Deployment Pipeline Stage...'"
+                sh "echo 'Tagging new Image Version'"
+                sh "echo 'docker tag new_store_application_image 
+                crazycoderrr/store_service@$API_VERSION'"
+                sh "echo 'Tagged Successfully.. Pushing Image On Docker Hub..'"
+                sh "echo 'docker push crazycoderrr/store_service'"
+                sh "echo 'Image has been Pushed Successfully! Pipeline Finished.'"
+            }
+        }
+    }
+}

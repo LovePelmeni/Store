@@ -2,10 +2,10 @@ apiVersion: apps/v1
 kind: Deployment 
 
 metadata:
-  name: store-application-server
+  name: store-application-service
   namespace: store-namespace 
   labels: 
-    app: store-application-server
+    app: store-application-service
 
 spec:
   selector:

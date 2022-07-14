@@ -2,7 +2,7 @@ apiVersion: v1
 kind: ConfigMap 
 metadata: 
   name: postgres-config-map 
-  namespace: store_namespace 
+  namespace: store-namespace 
   
 data:
   POSTGRES_DB: application_db 
