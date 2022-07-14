@@ -7,6 +7,9 @@ import (
 	"errors"
 	"sync"
 
+	"fmt"
+	"regexp"
+
 	"github.com/LovePelmeni/OnlineStore/StoreService/external_services/orders/firebase"
 	"github.com/LovePelmeni/OnlineStore/StoreService/models"
 )
@@ -57,14 +60,14 @@ type OrderCredentialsInterface interface {
 	// Requires Following Structure To Be passed as a Order Credentials:
 
 	Validate() (bool, error)
-	GetCredentials() (OrderCredentialsInterface, error)
+	GetCredentials() (OrderCredentialsInterface, []error)
 }
 
 //go:generate -destination=StoreService/mocks/orders.go . OrderControllerInterface
 type OrderControllerInterface interface {
 	// Interface that represents the Main Controller Responsible For Handling Any Operations,
 	// Related to the `Orders`
-	CreateOrder(OrderCredentials OrderCredentialsInterface) (bool, error)
+	CreateOrder(OrderCredentials OrderCredentialsInterface) (bool, []error)
 	CancelOrder(OrderId string) (bool, error)
 }
 
@@ -112,43 +115,164 @@ func NewOrderCredentials(Credentials struct {
 	return &OrderCredentials{Credentials: Credentials}
 }
 
-func (this *OrderCredentials) Validate() error {
+func (this *OrderCredentials) Validate() (*OrderCredentials, []error) {
 
-	var ValidatedCustomersInfo interface{}
-	var ValidatedProductsInfo interface{}
+	var ValidationErrors struct {
+		Mutex  sync.RWMutex
+		Errors []error
+	}
+	// If goroutines Run Successfully, `Errors` field will be equals to emtpy list.
 
-	_ = ValidatedCustomersInfo
-	_ = ValidatedProductsInfo
+	var ValidatedCustomersInfo struct {
+		mutex     sync.RWMutex
+		Purchaser *models.Customer
+	}
+
+	var ValidatedProductsInfo struct {
+		mutex            sync.RWMutex
+		Products         []*models.Product
+		TotalPrice       string
+		Currency         string
+		ProductsQuantity string
+	}
 
 	group := sync.WaitGroup{}
 
 	// Validating Customer Info..
 
-	go func(CustomerCredentials ...this.Credentials) {
+	go func(CustomerCredentials struct{ Purchaser *models.Customer }) {
 		// If Data is valid it will put it into `ValidatedCustomersInfo`
 		group.Add(1)
 
+		customer := &models.Customer{}
+
+		if Exists := models.Database.Table("customers").Where(
+			"Username = ?", CustomerCredentials.Purchaser.Username).First(&customer); Exists.Error != nil {
+
+			ValidationErrors.Mutex.Lock() // Writing Exception to the Errors List and Locking in order to avoid Race Condition.
+			ValidationErrors.Errors = append(ValidationErrors.Errors,
+				errors.New(fmt.Sprintf("User Specific in the Order"+
+					"As Purchaser With Username: %s Not Found.", CustomerCredentials.Purchaser.Username)))
+			ValidationErrors.Mutex.Unlock()
+
+		} else {
+			ValidatedCustomersInfo.mutex.Lock()
+			ValidatedCustomersInfo.Purchaser = customer
+		} // Updated the Customer Purchaser Field...
+
+		// Validating Other Order Params and matching to the Specified Purchaser Credentials.
+		PropertyItems, Error := reflection.Items(CustomerCredentials)
+		if Error != nil {
+			InfoLogger.Println("Failed to Break Up Customer Structure into reflection library Items Property, external library error.")
+		}
+		for Property, Value := range PropertyItems {
+
+			CustomerFieldValue, Error := reflection.GetField(Property, customer) // Receiving the Customer Field
+			if Equals := CustomerFieldValue == Value; Equals != true {           // If not Matches to the Original Value, Writing Exception...
+
+				ValidationErrors.Mutex.Lock()
+				ValidationErrors.Errors = append(ValidationErrors.Errors,
+					errors.New(fmt.Sprintf("Invalid Value for Field `%s` Passed to the Order,"+
+						" Does not Match Purchaser Confidential Information.", Property)))
+				ValidationErrors.Mutex.Unlock()
+			}
+		}
+
 		group.Done()
-	}(this.Credentials)
+	}(this.Credentials.PurchasersInfo)
 
 	// Validating Products Info..
-	go func(ProductsCredentials ...this.Credentials) {
+	go func(ProductsCredentials struct {
+		Products         []*models.Product
+		TotalPrice       string
+		Currency         string
+		ProductsQuantity string
+	}) {
 
 		// If Data is Valid it will put it into `ValidatedProductsInfo`
 		group.Add(1)
+
+		// matching value patterns
+		matchingPatterns := map[string]string{
+			"Currency":         "regex-pattern-for-currency", // Regex for Currency, Explanation: ....
+			"TotalPrice":       "regex-pattern-for-price",    // Regex pattern For Price, Explanation: ....
+			"ProductsQuantity": "[0-100]",                    // regex pattern for Products Quantity, Explanation: Just checks if the passed string is a number from 0 to 100.
+		}
+		ProductProperties, Error := reflection.Items(ProductsCredentials)
+		if Error != nil {
+			InfoLogger.Println("Failed to Break Up Product Structure Into reflection Items. external Library Error.")
+		}
+		for Property, Value := range ProductProperties {
+
+			if Matches, Error := regexp.Match(matchingPatterns[Property], Value); Matches != true { // Checking For the Regex Value match to the Presented Value..
+
+				_ = Error
+				ValidationErrors.Errors.Mutex.Lock() // Locking Mutex in order to avoid Race Condition...
+				ValidationErrors.Errors = append(ValidationErrors.Errors, errors.New(
+					fmt.Sprintf("Invalid Value for field")))
+				ValidationErrors.Errors.Mutex.Unlock()
+
+			} else {
+				_ = Error
+				ValidatedProductsInfo.mutex.Lock()
+
+				if Set, Error := reflection.SetField(Property, Value, ProductProperties); Error != nil {
+					DebugLogger.Println("Failed to Set Valid Property to Structure.")
+					ValidatedProductsInfo.mutex.Unlock()
+
+				}
+			}
+		}
 		group.Done()
-	}(this.Credentials)
-	return nil
+	}(this.Credentials.ProductsInfo)
+
+	group.Wait()
+
+	Response, Errors := func() (*OrderCredentials, []error) {
+		if len(ValidationErrors.Errors) != 0 {
+			return nil, ValidationErrors.Errors
+		} else {
+
+			return NewOrderCredentials(
+
+				struct {
+					mutex            sync.RWMutex
+					OrderName        string
+					OrderDescription string
+
+					Credentials struct {
+						PurchasersInfo struct {
+							Purchaser *models.Customer
+						}
+
+						ProductsInfo struct {
+							Products         []*models.Product
+							TotalPrice       string
+							Currency         string
+							ProductsQuantity string
+						}
+					}
+				}{
+					OrderName:        this.Credentials.OrderName,
+					OrderDescription: this.Credentials.OrderDescription,
+					Credentials: {
+						PurchasersInfo: ValidatedCustomersInfo,
+						ProductsInfo:   ValidatedProductsInfo,
+					},
+				}), nil
+		}
+	}()
+	return Response, Errors
 }
 
-func (this *OrderCredentials) GetCredentials() (*OrderCredentials, error) {
-	Error := this.Validate()
-	if Error != nil {
+func (this *OrderCredentials) GetCredentials() (*OrderCredentials, []error) {
+	OrderCredentials, Errors := this.Validate()
+	if len(Errors) != 0 {
 		InfoLogger.Println(
 			"Invalid Order Credentials has been passed.")
-		return nil, errors.New("Invalid Credentials")
+		return nil, Errors
 	}
-	return this, nil
+	return OrderCredentials, nil
 }
 
 type OrderController struct {
@@ -159,16 +283,16 @@ func NewOrderController(FirebaseOrderManager *firebase.FirebaseDatabaseOrderMana
 	return &OrderController{FirebaseManager: FirebaseOrderManager}
 }
 
-func (this *OrderController) CreateOrder(OrderCredentials OrderCredentialsInterface) (bool, error) {
+func (this *OrderController) CreateOrder(OrderCredentials OrderCredentialsInterface) (bool, []error) {
 
-	OrderCredentials, Error := OrderCredentials.GetCredentials() // Validating Credentials First..
-	if Error != nil {
-		return false, Error
+	OrderCredentials, Errors := OrderCredentials.GetCredentials() // Validating Credentials First..
+	if len(Errors) != 0 {
+		return false, Errors
 	}
 
 	if Created, Error := this.FirebaseManager.CreateOrder(OrderCredentials); Created != true || Error != nil {
 		ErrorLogger.Println("Failed to Create Order.. Reason: " + Error.Error())
-		return false, Error
+		return false, []error{Error}
 	}
 	return true, nil
 }
