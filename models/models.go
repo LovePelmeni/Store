@@ -7,17 +7,10 @@ import (
 	_ "strings"
 	"time"
 
-	"context"
 	"reflection"
-	"regexp"
-
-	grpcCustomers "github.com/LovePelmeni/OnlineStore/Payment-Service/grpc/customers"
-
-	"sync"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 )
 
 var (
@@ -49,44 +42,6 @@ var (
 	))
 )
 
-type BaseValidator interface {
-	// Base Validator Interface ...
-	Validate() (string, error)
-}
-
-var (
-	Validators = []BaseValidator{
-		PriceValidator{},
-		CurrencyValidator{},
-	}
-)
-
-type CurrencyValidator struct {
-	Value string
-}
-
-func (this CurrencyValidator) Validate() (string, error) {
-	CurrencyPattern := ""
-	if Matched, Error := regexp.MatchString(CurrencyPattern, this.Value); Matched == false {
-		return "", Error
-	} else {
-		return this.Value, nil
-	}
-}
-
-type PriceValidator struct {
-	Value string
-}
-
-func (this PriceValidator) Validate() (string, error) {
-	PricePattern := ""
-	if Matched, Error := regexp.MatchString(PricePattern, this.Value); Matched == false {
-		return "", Error
-	} else {
-		return this.Value, nil
-	}
-}
-
 /// Models ...
 
 func init() {
@@ -101,119 +56,26 @@ func init() {
 	WarnLogger = log.New(LogFile, "WARNING: ", log.Ldate|log.Ltime|log.Lshortfile)
 }
 
-func NewBaseModel(Model *gorm.DB) {
-	return
-}
-
 type BaseModel interface {
 	// ORM Model Interface with base Methods that every model need to have.
-	ApplyRestrictedFields() bool
-	GetRestrictedFields() []string
-	Create(ObjectData map[string]interface{}) interface{}
+	Create(ObjectData map[string]interface{}) *BaseModel
 	Update(UpdatedData map[string]interface{}) bool
 	Delete(ObjectId string)
-}
-
-func init() {
-	// Applying Tables Constraints...
-	Models := []BaseModel{} // List of the Models...
-	for _, model := range Models {
-		if applied := model.ApplyRestrictedFields(); applied != true {
-			ErrorLogger.Println("Failed to Apply Orm Table Restrict Dependencies.")
-			panic(fmt.Sprintf("Orm Restriction Error, Model: %s", model))
-		}
-	}
-	DebugLogger.Println("Constraints has been applied successfully.")
-}
-
-type OwnerCredentials struct {
-	CardNumber  string
-	FirstName   string
-	LastName    string
-	PhoneNumber string
-	Email       string
-}
-
-func (this *OwnerCredentials) Validate() {
-	Patterns := []string{} // list of regex patterns for the field data....
 }
 
 type Product struct {
 	gorm.Model
 
-	OwnerId                       string
-	SerializedBankCardCredentials OwnerCredentials `gorm:"VARCHAR(100) NOT NULL;"`
-	ProductName                   string           `gorm:"VARCHAR(100) NOT NULL"`
-	ProductDescription            string           `gorm:"VARCHAR(100) NOT NULL DEFAULT 'This Product Has No Description'"`
-	ProductPrice                  string           `gorm:"NUMERIC(10, 5) NOT NULL"`
-	Currency                      string           `gorm:"VARCHAR(10) NOT NULL"`
+	OwnerEmail         string `gorm:"VARCHAR(100) NOT NULL;"`
+	ProductName        string `gorm:"VARCHAR(100) NOT NULL"`
+	ProductDescription string `gorm:"VARCHAR(100) NOT NULL DEFAULT 'This Product Has No Description'"`
+	ProductPrice       string `gorm:"NUMERIC(10, 5) NOT NULL"`
+	Currency           string `gorm:"VARCHAR(10) NOT NULL"`
 }
 
 // Create Controller...
 
-func (this *Product) CreateObject(
-
-	ObjectData struct {
-		ProductName        string
-		ProductDescription string
-		OwnerId            string
-	},
-
-	PriceCredentials struct {
-		ProductPrice string
-		Currency     string
-	},
-
-) *Product {
-
-	Validators := []BaseValidator{
-		PriceValidator{Value: PriceCredentials.ProductPrice},
-		CurrencyValidator{Value: PriceCredentials.Currency},
-	}
-
-	// Validated Price Credentials...
-
-	ValidatedPrice, PriceError := Validators[0].Validate()
-	ValidatedCurrency, CurrencyError := Validators[1].Validate()
-
-	if PriceError != nil || CurrencyError != nil {
-		return nil
-	}
-
-	ValidatedPriceCredentials := map[string]string{
-		"Price":    ValidatedPrice,
-		"Currency": ValidatedCurrency,
-	}
-
-	// Validating Other String Product Params...
-
-	for element, value := range reflection.Items(ObjectData) {
-		if len(element) == 0 || element == nil {
-			return nil
-		}
-	}
-
-	// Creates New Object...
-
-	newProduct := Product{
-		ProductName:        ObjectData.ProductName,
-		OwnerId:            ObjectData.OwnerId,
-		ProductDescription: ObjectData.ProductDescription,
-		ProductPrice:       ValidatedPriceCredentials["Price"],
-		Currency:           ValidatedPriceCredentials["Currency"],
-	}
-
-	// Saving to the Database...
-
-	Saved := Database.Table("products").Save(&newProduct)
-	if Saved.Error != nil {
-		Saved.Rollback()
-		ErrorLogger.Println(fmt.Sprintf(
-			"Failed To Create Product. Reason: %s", Saved.Error))
-		return nil
-	}
-	Saved.Commit()
-	return &newProduct
+func (this *Product) CreateObject() {
 }
 
 // Updating Controller...
@@ -270,81 +132,7 @@ func (this *Customer) CreateObject(ObjectData struct {
 	Email     string
 	CreatedAt time.Time
 }, PurchasedProducts ...[]Product) *Customer {
-
-	newCustomer := Customer{
-		Username:          ObjectData.Username,
-		Password:          ObjectData.Password,
-		Email:             ObjectData.Email,
-		PurchasedProducts: []Product{},
-	}
-
-	Saved := Database.Table("customers").Save(&newCustomer)
-	if Saved.Error != nil {
-		Saved.Rollback()
-		return nil
-	} else {
-		Saved.SavePoint("Pre-Saved")
-	} // Making Save Point or returns Failure
-
-	// Sending
-
-	group := sync.WaitGroup{}
-	channel := make(chan bool, 10000)
-
-	go func(channel chan bool, CustomerInfo *Customer) {
-
-		group.Add(1)
-		client, CreationError := grpcCustomers.NewCustomerClient()
-		if CreationError != nil {
-			log.Fatal("Failed To Create Customer.")
-		}
-
-		RequestContext, CancelError := context.WithTimeout(context.Background(), 10*time.Second)
-		CustomerParams := grpcCustomers.CustomerParams{
-			Username: CustomerInfo.Username,
-		}
-
-		response, error := client.CreateCustomer(RequestContext, CustomerParams)
-		if response.Created != true || error != nil {
-			channel <- false
-		} else {
-			channel <- true
-		}
-		// Notifying about Customer Creation Status...
-
-		defer CancelError()
-		group.Done()
-
-	}(channel, &newCustomer)
-
-	group.Wait()
-
-	select {
-	case Status := <-channel:
-		close(channel) // Closing Channel After Receiving the Data....
-
-		if created := Status; created != false {
-
-			DebugLogger.Println("Customer Has been Created Successfully.")
-			if Saved.Error != nil {
-				ErrorLogger.Println("Failed to Create Local Customer." +
-					"While Remote `Payment` One Has already been, Aborting...")
-				return nil
-			}
-			Saved.Commit() // Commiting Transaction ..
-			return &newCustomer
-
-		} else {
-			ErrorLogger.Println(
-				"Failed to Create Payment Remote Profile for the Customer. Aborting Transaction.")
-			Saved.Rollback() // Rollbacking the transaction...
-			return nil
-		}
-	default:
-		close(channel) // Closing Channel..
-		ErrorLogger.Println("Failed to Receive Channel Request.")
-		return nil
-	}
+	return &Customer{}
 }
 
 func (this *Customer) UpdateObject(ObjId string, UpdatedData struct{ Password string }) bool {
@@ -359,60 +147,7 @@ func (this *Customer) UpdateObject(ObjId string, UpdatedData struct{ Password st
 }
 
 func (this *Customer) DeleteObject(ObjId string) bool {
-
-	Database.Clauses(clause.Locking{Strength: "EXCLUSIVE MODE", // Locking Table In Order to prevent any interactions with this User.
-		Table: clause.Table{Name: "customers"}}).Where("id = ?", ObjId)
-
-	Deleted := Database.Table("customers").Delete(ObjId) // Deleting Customer But Without Committing Transaction..
-
-	group := sync.WaitGroup{}
-	channel := make(chan bool, 1000)
-
-	go func(channel chan bool, ObjId string) { // Deleting Payment Customer Profile Using GRPC Protobuf
-
-		group.Add(1)
-		client := grpcCustomers.NewCustomerClient()
-		RequestContext, CancelError := context.WithTimeout(context.Background(), 10*time.Second)
-
-		CustomerDeleteParams := grpcCustomers.CustomerDeleteParams{ // GRPC Request Params...
-			CustomerId: ObjId,
-		}
-
-		Response, Error := client.DeleteCustomer(RequestContext, CustomerDeleteParams) // Sending GRPC Request to Delete The Customer...
-		if HasBeenDeleted := Response.Deleted; HasBeenDeleted == true && Error == nil {
-			channel <- true
-		} else {
-			channel <- false
-		}
-
-		defer CancelError()
-		group.Done()
-
-	}(channel, ObjId)
-
-	group.Wait()
-
-	select {
-
-	case Status := <-channel:
-
-		close(channel)
-
-		if Status != true {
-			ErrorLogger.Println(
-				"Failed to Delete Customer with ID:" + ObjId)
-			Deleted.Rollback()
-			return false
-		} else {
-			Deleted.Commit()
-			return true
-		}
-
-	default:
-		close(channel)
-		ErrorLogger.Println("Response via Channel Has been Lost, Aborting..")
-		return false
-	}
+	return true
 }
 
 type Cart struct {
@@ -464,27 +199,4 @@ func (this *Cart) DeleteObject(ObjId string) bool {
 		Deleted.Commit()
 		return true
 	}
-}
-
-func CartOneOwnerConstraintTrigger() {
-	// Adds trigger constraint that allows to have only one Owner Per Cart, In avoid of merging Orders.
-	command := fmt.Sprintf(`CREATE FUNCTION public.check_one_cart_owner() 
-	RETURNS TRIGGER 
-	LANGUAGE 'plpgsql'
-	AS $BODY$ 
-	DECLARE updated integer;
-	BEGIN UPDATE %s SET owner = owner + 1 WHERE cart.id = NEW.cart_id AND cart.owner < 1;
-	GET DIAGNOSTICS addedOwners = ROW_COUNT 
-	IF addedOwners = 0 THEN 
-	RAISE EXCEPTION 'Cart can have only one owner.'
-	END IF;
-	RETURN NEW;
-	END; 
-	$BODY$;
-	
-	CREATE TRIGGER OwnerCartConstraintTrigger 
-	BEFORE INSERT ON public.cart
-	FOR EACH ROW EXECUTE PROCEDURE public.check_one_cart_owner();`, "cart")
-	Database.Exec(command)
-	DebugLogger.Println("Unique Constraint Has Been Integrated.")
 }
