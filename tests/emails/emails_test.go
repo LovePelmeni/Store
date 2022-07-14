@@ -57,7 +57,7 @@ func (this *EmailIntegrationSuite) TestFailSendEmail() {
 	customerEmail := "test@gmail.com"
 	message := "Test Message"
 
-	this.MockedEmailClientInterface.EXPECT().SendOrderEmail().Return(nil, Exception).Times(1)
+	this.MockedEmailClientInteface.EXPECT().SendOrderEmail().Return(nil, Exception).Times(1)
 	ActualResponse, error := this.EmailSenderController.SendDefaultEmail(customerEmail, message)
 
 	assert.Equal(this.T(), ActualResponse, nil, "Response Should Equal To None.")

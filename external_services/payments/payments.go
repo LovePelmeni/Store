@@ -23,7 +23,10 @@ var (
 )
 
 func init() {
-	LogFile := os.OpenFile("payments.log")
+	LogFile, error := os.OpenFile("payments.log", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0666)
+	if error != nil {
+		return errors.New("")
+	}
 	DebugLogger = log.New(LogFile, "DEBUG: ")
 	InfoLogger = log.New(LogFile, "INFO: ")
 	ErrorLogger = log.New(LogFile, "ERROR: ")

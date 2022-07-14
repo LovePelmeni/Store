@@ -91,3 +91,18 @@ func CheckValidJwtToken(token string) error {
 	}
 	return nil
 }
+
+func GetCustomerJwtCredentials(token string) (map[string]string, error) {
+
+	DecodedData := &JwtToken{}
+	DecodedToken, error := jwt.ParseWithClaims(token, DecodedData,
+		func(token *jwt.Token) (interface{}, error) { return secretKey, nil })
+	_ = DecodedToken
+
+	if error != nil {
+		InfoLogger.Println("Invalid Jwt Token")
+		return nil, InvalidJwt()
+	}
+	return map[string]string{"username": DecodedData.Username,
+		"email": DecodedData.Email}, nil
+}

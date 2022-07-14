@@ -66,11 +66,11 @@ type BaseModel interface {
 type Product struct {
 	gorm.Model
 
-	OwnerEmail         string `gorm:"VARCHAR(100) NOT NULL;"`
-	ProductName        string `gorm:"VARCHAR(100) NOT NULL"`
-	ProductDescription string `gorm:"VARCHAR(100) NOT NULL DEFAULT 'This Product Has No Description'"`
-	ProductPrice       string `gorm:"NUMERIC(10, 5) NOT NULL"`
-	Currency           string `gorm:"VARCHAR(10) NOT NULL"`
+	OwnerEmail         string  `gorm:"VARCHAR(100) NOT NULL;"`
+	ProductName        string  `gorm:"VARCHAR(100) NOT NULL"`
+	ProductDescription string  `gorm:"VARCHAR(100) NOT NULL DEFAULT 'This Product Has No Description'"`
+	ProductPrice       float64 `gorm:"NUMERIC(10, 5) NOT NULL"`
+	Currency           string  `gorm:"VARCHAR(10) NOT NULL"`
 }
 
 // Create Controller...
@@ -200,3 +200,5 @@ func (this *Cart) DeleteObject(ObjId string) bool {
 		return true
 	}
 }
+
+ 
