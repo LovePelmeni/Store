@@ -1,18 +1,13 @@
+// Pipeline that Builds / Tests / Deploys the new Version of the Image.
 pipeline {
 
     agent any 
-    environment { 
-        API_VERSION="v1" // this version need to be specified within the commit... 
-        APPLICATION_HOST=""
-        APPLICATION_PORT=""
-    }
-
     stages {
 
         stage("build"){
 
             steps{
-                sh "echo 'Running Build Pipeline'"
+                sh "echo 'Running Build Pipeline...'"
                 sh "echo 'docker build . --name=new_store_application_image'"
                 sleep 10 
                 echo "Docker Built Image Successfully! And Initial Tests Has been Passed. 
@@ -25,7 +20,7 @@ pipeline {
                 // checking for application health..
                 sh "echo 'Running Test Pipeline'"
                 sh "echo 'Running Healtcheck Test...'"
-                sh "echo 'curl -f http://$APPLICATION_HOST:$APPLICATION_PORT'"
+                sh "echo 'curl -f http://${env.APPLICATION_HOST}:${env.APPLICATION_PORT}'"
                 sh "echo 'Application Health State Is Okay... Running Other Tests...'"
                 sh "echo 'All Tests Passed... Running Deployment Pipeline...'"
             }
@@ -33,13 +28,15 @@ pipeline {
 
         stage("deployment"){
 
-            steps{
+            steps{  
+                load "./version_env.groovy"
+                sh "Deploying New API Version: ${env.VERSION}"
                 sh "echo 'Running Deployment Pipeline Stage...'"
                 sh "echo 'Tagging new Image Version'"
                 sh "echo 'docker tag new_store_application_image 
-                crazycoderrr/store_service@$API_VERSION'"
+                crazycoderrr/store_service@${env.VERSION}'"
                 sh "echo 'Tagged Successfully.. Pushing Image On Docker Hub..'"
-                sh "echo 'docker push crazycoderrr/store_service'"
+                sh "echo 'docker push crazycoderrr/store_service@${env.VERSION}'"
                 sh "echo 'Image has been Pushed Successfully! Pipeline Finished.'"
             }
         }

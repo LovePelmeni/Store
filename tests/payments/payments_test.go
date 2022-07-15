@@ -59,10 +59,40 @@ func (this *PaymentIntentSuite) TestPaymentIntentFailCreate() {
 
 type PaymentSessionSuite struct {
 	suite.Suite
-	Controller *gomock.Controller
+	Controller                      *gomock.Controller
+	MockedPaymentSessionCredentials *mock_session.MockedPaymentSessionCredentialsInterface
+	MockedPaymentSessionClient      *mock_session.MockedPaymentSessionClientInterface
+	PaymentSessionController        *payments.PaymentSessionController
 }
 
-type PaymentCheckoutSuite struct {
+func (this *PaymentSessionSuite) SetupTest() {
+
+	MockedGrpcServerConnection := mock_grpc.NewMockGrpcServerConnection()
+
+	this.Controller = gomock.NewController(this.T())
+	this.MockedPaymentSessionClient = mock_session.NewMockPaymentSessionClient(MockedGrpcServerConnection)
+	this.PaymentSessionController = payments.NewPaymentSessionController(this.MockedPaymentSessionClient)
+}
+
+func (this *PaymentSessionSuite) TestPaymentSessionCreate() {
+	PaymentSessionCredentials := payments.PaymentSessionCredentials{
+		ProductId:   "test-product-id",
+		PurchaserId: "test-purchaser-id",
+	}
+
+	this.MockedPaymentSessionCredentials.EXPECT().GetCredentials().Return(PaymentSessionCredentials, nil).Times(1)
+	this.MockedPaymentSessionClient.EXPECT().CreatePaymentSession(
+		grpcControllers.PaymentSessionParams{
+			ProductId:   PaymentSessionCredentials.ProductId,
+			PurchaserId: PaymentSessionCredentials.PurchaserId}).Return(true, nil).Times(1)
+
+	Response, Error := this.PaymentSessionController.CreatePaymentSession(
+		this.MockedPaymentSessionCredentials)
+	assert.Equal(this.T(), Response, true, "Response should be equals to true.")
+	assert.Equal(this.T(), Error, nil, "Error Should be equals to None, Because of Success Payment Session Response.")
+}
+
+type PaymentRefundSuite struct {
 	suite.Suite
 	Controller *gomock.Controller
 }

@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"fmt"
+	"reflect"
 	"regexp"
 
 	"github.com/LovePelmeni/OnlineStore/StoreService/external_services/orders/firebase"
@@ -161,20 +162,24 @@ func (this *OrderCredentials) Validate() (*OrderCredentials, []error) {
 			ValidatedCustomersInfo.Purchaser = customer
 		} // Updated the Customer Purchaser Field...
 
-		// Validating Other Order Params and matching to the Specified Purchaser Credentials.
-		PropertyItems, Error := reflection.Items(CustomerCredentials)
-		if Error != nil {
-			InfoLogger.Println("Failed to Break Up Customer Structure into reflection library Items Property, external library error.")
-		}
-		for Property, Value := range PropertyItems {
+		// Matching Customer's ORM Model Object Properties, to that, that has been Passed in the Orders Form.
 
-			CustomerFieldValue, Error := reflection.GetField(Property, customer) // Receiving the Customer Field
-			if Equals := CustomerFieldValue == Value; Equals != true {           // If not Matches to the Original Value, Writing Exception...
+		StructuredCustomerCredentialsValue := reflect.ValueOf(CustomerCredentials).Elem() // Data, that has been Passed from the Order Form Credentials.
+		StructuredCustomersProfileValue := reflect.ValueOf(customer).Elem()               // Data That has been retrieved from the ORM Model Object of the Customer.
+
+		for PropertyIndex := 1; PropertyIndex < reflect.TypeOf(&CustomerCredentials).NumField(); PropertyIndex++ {
+
+			CustomerFieldValue := StructuredCustomerCredentialsValue.Field(PropertyIndex).String() // Receiving the Customer Field
+
+			if Equals := CustomerFieldValue ==
+				StructuredCustomersProfileValue.Field(PropertyIndex).String(); Equals != true { // If not Matches to the Original Value, Writing Exception...
 
 				ValidationErrors.Mutex.Lock()
 				ValidationErrors.Errors = append(ValidationErrors.Errors,
 					errors.New(fmt.Sprintf("Invalid Value for Field `%s` Passed to the Order,"+
-						" Does not Match Purchaser Confidential Information.", Property)))
+						" Does not Match Purchaser Confidential Information.", reflect.TypeOf(
+						StructuredCustomerCredentialsValue).Field(PropertyIndex).Name)))
+
 				ValidationErrors.Mutex.Unlock()
 			}
 		}
@@ -199,13 +204,16 @@ func (this *OrderCredentials) Validate() (*OrderCredentials, []error) {
 			"TotalPrice":       "regex-pattern-for-price",    // Regex pattern For Price, Explanation: ....
 			"ProductsQuantity": "[0-100]",                    // regex pattern for Products Quantity, Explanation: Just checks if the passed string is a number from 0 to 100.
 		}
-		ProductProperties, Error := reflection.Items(ProductsCredentials)
-		if Error != nil {
-			InfoLogger.Println("Failed to Break Up Product Structure Into reflection Items. external Library Error.")
-		}
-		for Property, Value := range ProductProperties {
+		ProductProperties := reflect.ValueOf(ProductsCredentials).Elem()
 
-			if Matches, Error := regexp.Match(matchingPatterns[Property], Value); Matches != true { // Checking For the Regex Value match to the Presented Value..
+		for PropertyValueIndex := 1; PropertyValueIndex < reflect.TypeOf(ProductsCredentials).NumField(); PropertyValueIndex++ {
+
+			// Receiving Properties Info From the Structure....
+			Field := reflect.TypeOf(ProductProperties).Field(PropertyValueIndex)
+			FieldValue := ProductProperties.Field(PropertyValueIndex)
+
+			// Matching The Regex
+			if Matches, Error := regexp.MatchString(matchingPatterns[Field.Name], FieldValue.String()); Matches != true { // Checking For the Regex Value match to the Presented Value..
 
 				_ = Error
 				ValidationErrors.Mutex.Lock() // Locking Mutex in order to avoid Race Condition...
@@ -217,10 +225,11 @@ func (this *OrderCredentials) Validate() (*OrderCredentials, []error) {
 				_ = Error
 				ValidatedProductsInfo.mutex.Lock()
 
-				if Set, Error := reflection.SetField(Property, Value, ProductProperties); Error != nil {
+				// Checking If it's possible to replace the value, and setting up the right one.
+				if CanSet := ProductProperties.Field(PropertyValueIndex).CanSet(); CanSet == true {
+					ProductProperties.Field(PropertyValueIndex).Set(FieldValue)
 					DebugLogger.Println("Failed to Set Valid Property to Structure.")
 					ValidatedProductsInfo.mutex.Unlock()
-
 				}
 			}
 		}

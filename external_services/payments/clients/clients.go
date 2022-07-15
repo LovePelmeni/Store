@@ -75,3 +75,13 @@ func NewPaymentSessionClient(Connection *GrpcServerConnectionInterface) *Payment
 }
 
 func (this *PaymentSessionClient) GetClient() (*grpcControllers.PaymentSessionClient, error)
+
+type PaymentRefundClient struct {
+	Connection *GrpcServerConnectionInterface
+}
+
+func NewPaymentRefundClient(Connection *GrpcServerConnectionInterface) *PaymentRefundClient {
+	return &PaymentRefundClient{Connection: Connection}
+}
+
+func (this *PaymentRefundClient) GetClient() *grpcControllers.RefundClient

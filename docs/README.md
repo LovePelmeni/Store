@@ -4,28 +4,59 @@
 
 --- 
 
-
 ## *Introduction* 
 
-Store Application, 
+Store Application.
 
 --- 
 
-
 ## *Usage*
 
+Clone this Repo 
+```
+    $ git clone https://github.com/LovePelmeni/Store.git
+```
 
 --- 
 
 ## *Deploy* 
 
 
-### Database Stage 
+## Settings Up Databases.
+
 
 In this Stage the requirements should be: 
+
 `PostgreSQL Database` - `13.3` 
 
-### Docker Stage
+`Firebase Project with Real Time Database` 
+
+
+### *Using Kubernetes*
+
+1. Go and Setup Volumes and Claims + Secrets for Kubernetes `PostgreSQL` Manifest at `root/kubernetes/volumes/` and `root/kubernetes/config_maps` according to your requirements.
+
+2. Go to the ./kubernetes directory (if you are not there) Deploy the Kubernetes Volume & VolumeClaim & ConfigMap Using `kubectl apply -f ./config_maps/postgresMaps.yaml && kubectl apply -f ./volumes/postgresClaim.yaml && kubectl apply -f ./volumes/postgresVolume.yaml` 
+
+After that your Postgres database for the microservice should be ready.. Go and Check it out by running... 
+
+```
+    $ kubectl get statefulset store-postgres-database --namespace=store-namespace 
+```
+### *Using Docker*
+
+
+Go to the `./docker-compose.yaml` file at root directory and Change the Environment Variables for `postgres-store-database` service, according to your requirements.
+
+
+Then, go to the `project_env.env` file and replace the default `postgres` envinronment variables with that, you specified in the previous step. 
+
+
+Also you might need to change the `firebase` env vars, depends on the project that you have.
+
+--- 
+
+## Building Stage For the Project.
 
 To get the Initial Project Image `without Database and Integrated Services`
 Go to the Root Directory and execute 
@@ -33,6 +64,35 @@ Go to the Root Directory and execute
     $ docker build . --name=store_application
 ```
 
+
+### *Using Docker-Compose*
+
+To run the Full Microservice Using Docker-compose.yaml 
+
+```
+    $ docker-compose up -d 
+```
+
+
+### *Using Kubernetes*
+
+
+Depends on where you are going to run this application, 
+you need to check one of this Kubernetes Docs for this Project 
+
+~ [Deploying Store Microservice on Google Cloud]("https://github.com/LovePelmeni/Store/docs/kubernetes_docs/GCLOUD.md")
+
+~ [Deploying Store Microservice on local Dev Machine]("https://github.com/LovePelmeni/Store/docs/kubernetes_docs/LOCAL_ENV.md")
+
+--- 
+
+## Jenkins Integration 
+
+Go Checkout Documentation Guide for Jenkings Continious Delivery / Integration Pipeline.
+
+~ [Setting Up Jenkins Pipeline For Local Development]("https://github.com/LovePelmeni/Store/docs/jenkins/LOCAL_ENV.md")
+
+~ [Setting up Jenkins Pipeline For Google Cloud Kubernetes Cluster]("https://github.com/LovePelmeni/Store/docs/jenkings/GCLOUD.md")
 
 --- 
 

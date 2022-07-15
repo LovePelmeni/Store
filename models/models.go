@@ -7,8 +7,6 @@ import (
 	_ "strings"
 	"time"
 
-	"reflection"
-
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -66,7 +64,7 @@ type BaseModel interface {
 type Product struct {
 	gorm.Model
 
-	OwnerEmail         string  `gorm:"VARCHAR(100) NOT NULL;"`
+	OwnerEmail         string  `gorm:"VARCHAR(100) NOT NULL"`
 	ProductName        string  `gorm:"VARCHAR(100) NOT NULL"`
 	ProductDescription string  `gorm:"VARCHAR(100) NOT NULL DEFAULT 'This Product Has No Description'"`
 	ProductPrice       float64 `gorm:"NUMERIC(10, 5) NOT NULL"`
@@ -85,12 +83,6 @@ func (this *Product) UpdateObject(ObjId string,
 		ProductName        string
 		ProductDescription string
 	}) bool {
-
-	for element, value := range reflection.Items(UpdatedData) {
-		if len(value) == 0 || value == nil {
-			reflection.Remove(UpdatedData, element)
-		}
-	}
 
 	Updated := Database.Table("products").Where("id = ?", ObjId).Updates(UpdatedData)
 	if Updated.Error != nil {
@@ -122,8 +114,9 @@ type Customer struct {
 	Password          string `gorm:"VARCHAR(100) NOT NULL";json:"Password"`
 	Email             string `gorm:"VARCHAR(100) NOT NULL UNIQUE";json:"Email"`
 	ProductId         string
-	PurchasedProducts []Product `gorm:"foreignKey:Product;references:ProductId;DEFAULT NULL;constraint:ON DELETE PROTECT;";json:"PurchasedProducts"`
-	CreatedAt         time.Time `gorm:"DATE DEFAULT CURRENT DATE";json:"CreatedAt"`
+	PurchasedProducts []Product `gorm:"foreignKey:Product;references:ProductId;DEFAULT NULL;constraint:ON DELETE PROTECT;";
+	 							json:"PurchasedProducts;constraint:OnDelete Protect;"`
+	CreatedAt time.Time `gorm:"DATE DEFAULT CURRENT DATE";json:"CreatedAt"`
 }
 
 func (this *Customer) CreateObject(ObjectData struct {
@@ -155,8 +148,8 @@ type Cart struct {
 
 	CustomerId string
 	ProductId  string
-	Owner      Customer  `gorm:"foreignKey:Customer;references:CustomerId;constraints: ON DELETE PROTECT;";json:"Owner"`
-	Products   []Product `gorm:"foreignKey:Customer;references:ProductId;constraints:ON DELETE PROTECT;";json:"Products"`
+	Owner      Customer  `gorm:"foreignKey:Customer;references:CustomerId;constraint:OnDelete Cascade;";json:"Owner"`
+	Products   []Product `gorm:"foreignKey:Customer;references:ProductId;constraints:OnDelete PROTECT;";json:"Products"`
 }
 
 // Cart Create Controller ..
@@ -200,5 +193,3 @@ func (this *Cart) DeleteObject(ObjId string) bool {
 		return true
 	}
 }
-
- 
