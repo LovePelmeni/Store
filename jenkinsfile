@@ -3,6 +3,8 @@ pipeline {
     agent any 
     environment { 
         API_VERSION="v1" // this version need to be specified within the commit... 
+        APPLICATION_HOST=""
+        APPLICATION_PORT=""
     }
 
     stages {

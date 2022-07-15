@@ -121,6 +121,7 @@ func (this *OrderCredentials) Validate() (*OrderCredentials, []error) {
 		Mutex  sync.RWMutex
 		Errors []error
 	}
+
 	// If goroutines Run Successfully, `Errors` field will be equals to emtpy list.
 
 	var ValidatedCustomersInfo struct {
@@ -207,10 +208,10 @@ func (this *OrderCredentials) Validate() (*OrderCredentials, []error) {
 			if Matches, Error := regexp.Match(matchingPatterns[Property], Value); Matches != true { // Checking For the Regex Value match to the Presented Value..
 
 				_ = Error
-				ValidationErrors.Errors.Mutex.Lock() // Locking Mutex in order to avoid Race Condition...
+				ValidationErrors.Mutex.Lock() // Locking Mutex in order to avoid Race Condition...
 				ValidationErrors.Errors = append(ValidationErrors.Errors, errors.New(
 					fmt.Sprintf("Invalid Value for field")))
-				ValidationErrors.Errors.Mutex.Unlock()
+				ValidationErrors.Mutex.Unlock()
 
 			} else {
 				_ = Error
@@ -276,7 +277,7 @@ func (this *OrderCredentials) GetCredentials() (*OrderCredentials, []error) {
 }
 
 type OrderController struct {
-	FirebaseManager *firebase.FirebaseDatabaseOrderManager // for managing orders...
+	FirebaseManager firebase.FirebaseDatabaseOrderManagerInterface // for managing orders...
 }
 
 func NewOrderController(FirebaseOrderManager *firebase.FirebaseDatabaseOrderManager) *OrderController {

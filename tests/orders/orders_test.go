@@ -44,7 +44,7 @@ func (this *OrderSuite) TestCreateOrder() {
 
 	ActualResponse, Error := this.OrderController.CreateOrder(this.MockedOrderCredentials)
 	assert.Equal(this.T(), ActualResponse, true)
-	assert.NoError(this.T(), Error)
+	assert.NoError(this.T(), Error[0])
 }
 
 func (this *OrderSuite) TestFailCreateOrder() {

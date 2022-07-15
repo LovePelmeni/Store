@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: PersistentVolume 
 metadata:
   name: persistent-postgres-volume
-  namespace: store_namespace 
+  namespace: store-namespace 
 
 spec:
   StorageClassName: {{ ./VolumeSettings.StorageClassName }} 

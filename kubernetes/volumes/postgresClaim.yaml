@@ -1,8 +1,8 @@
 apiVersion: apps/v1 
-kind: persistentClaim 
+kind: PersistentVolumeClaim 
 metadata:
   name: persistent-postgres-claim 
-  namespace: store_namespace 
+  namespace: store-namespace 
 
 spec:
   StorageClassName: {{ ./VolumeSettings.StorageClassName }} 
