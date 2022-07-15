@@ -2,10 +2,13 @@ package customers
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
 	"time"
+
+	"reflect"
 
 	"github.com/LovePelmeni/OnlineStore/StoreService/authentication"
 	models "github.com/LovePelmeni/OnlineStore/StoreService/models"
@@ -20,35 +23,55 @@ var (
 	InfoLogger    *log.Logger
 )
 
-func init() {
+func InitializeLoggers() (bool, error) {
 	LogFile, error := os.OpenFile("CustomerLog.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
 	if error != nil {
-		panic("Failed to Create Log file for Customers API.")
+		return false, error
 	}
 
 	DebugLogger = log.New(LogFile, "DEBUG: ", log.Ldate|log.Llongfile|log.Ltime)
 	InfoLogger = log.New(LogFile, "INFO: ", log.Ldate|log.Llongfile|log.Ltime)
 	ErrorLogger = log.New(LogFile, "ERROR: ", log.Ldate|log.Llongfile|log.Ltime)
+	return true, nil
+}
+
+func init() {
+	Initialized, Loggers := InitializeLoggers()
+	if !Initialized || Loggers != nil {
+		panic(Loggers)
+	}
 }
 
 //go:generate mockgen -destination=mocks/customer.go --build_flags=--mod=mod . CustomerInterface
 type CustomerInterface interface {
-	// Interface for Managing Customer Model
-	CreateCustomer(customerData map[string]interface{})
-	UpdateCustomer(customerId string, UpdatedData ...map[string]interface{})
+	// Interface for Managing Customer Model. Provides methods for CRUD operations.
+	// Such as...
+
+	ReceiveCustomer(customerId string) (*models.Customer, error)
+	CreateCustomer(customerData map[string]string)
+	UpdateCustomer(customerId string, UpdatedData ...map[string]string)
 	DeleteCustomer(customerId string)
 }
+
+// Validators
+var (
+	CustomerValidator = models.NewCustomerModelValidator()
+)
 
 var customer models.Customer
 
 func CreateCustomerRestController(RequestContext *gin.Context) {
 	// Creates Customer
 
+	StructuredFields := reflect.TypeOf(&models.Customer{})
+
 	NonSpecifiedFields := []string{}
-	for Property, Value := range reflection.Items(models.Customer) {
-		if Value := RequestContext.PostForm(Property); len(Value) == 0 {
-			result := append(NonSpecifiedFields, Property)
-			NonSpecifiedFields = result
+	for PropertyIndex := 1; PropertyIndex > StructuredFields.NumField(); PropertyIndex++ {
+		if Value := RequestContext.PostForm(StructuredFields.Field(PropertyIndex).Name); len(Value) == 0 {
+
+			NonSpecifiedFields = append(NonSpecifiedFields,
+				fmt.Sprintf("Not Specified Field: `%s",
+					StructuredFields.Field(PropertyIndex).Name))
 		} else {
 			continue
 		}
@@ -57,7 +80,7 @@ func CreateCustomerRestController(RequestContext *gin.Context) {
 	if len(NonSpecifiedFields) != 0 {
 		ErrorStatus := http.StatusBadRequest
 		RequestContext.JSON(ErrorStatus,
-			gin.H{"NonSpecifiedField": NonSpecifiedFields})
+			gin.H{"NonSpecifiedFields": NonSpecifiedFields})
 	}
 
 	newCustomerData := struct {
@@ -72,10 +95,10 @@ func CreateCustomerRestController(RequestContext *gin.Context) {
 		CreatedAt: time.Now(),
 	}
 
-	NewCustomer := customer.CreateObject(newCustomerData, nil, []models.Product{})
-	if NewCustomer == nil {
+	NewCustomer, Errors := customer.CreateObject(newCustomerData, CustomerValidator, []models.Product{})
+	if NewCustomer == nil || len(Errors) != 0 {
 		RequestContext.JSON(http.StatusNotImplemented,
-			gin.H{"error": "Failed to Create Customer."})
+			gin.H{"error": fmt.Sprintf("Failed to Create Customer. Error: %v", Errors)})
 	}
 
 	jwtToken := authentication.CreateJwtToken(
@@ -92,14 +115,17 @@ func CreateCustomerRestController(RequestContext *gin.Context) {
 }
 
 func UpdateCustomerRestController(context *gin.Context) {
-	// Updates Customer
 
 	customerId := context.Query("customerId")
-	MappedItems, error := reflection.Items(customer)
+	StructuredFields := reflect.TypeOf(&models.Customer{})
 
-	for element, value := range MappedItems {
-		if EmptyValue := context.PostForm(element); len(EmptyValue) == 0 {
-			context.Request.PostForm.Del(element)
+	NonSpecifiedFields := []string{}
+	for PropertyIndex := 1; PropertyIndex > StructuredFields.NumField(); PropertyIndex++ {
+		if Value := context.PostForm(StructuredFields.Field(PropertyIndex).Name); len(Value) == 0 {
+
+			NonSpecifiedFields = append(NonSpecifiedFields,
+				fmt.Sprintf("Not Specified Field: `%s",
+					StructuredFields.Field(PropertyIndex).Name))
 		} else {
 			continue
 		}
@@ -108,11 +134,11 @@ func UpdateCustomerRestController(context *gin.Context) {
 	updatedCustomerData := struct{ Password string }{
 		Password: context.PostForm("Password"),
 	}
-	updatedCustomer := customer.UpdateObject(customerId, updatedCustomerData)
+	updatedCustomer, Errors := customer.UpdateObject(customerId, updatedCustomerData, CustomerValidator)
 
 	if updatedCustomer == false {
 		context.JSON(
-			http.StatusNotImplemented, gin.H{"error": error})
+			http.StatusNotImplemented, gin.H{"error": Errors})
 	}
 
 	context.JSON(http.StatusCreated, nil)
@@ -130,10 +156,10 @@ func DeleteCustomerRestController(RequestContext *gin.Context) {
 	}
 
 	customerId := RequestContext.Query("customerId")
-	deleted := customer.DeleteObject(customerId)
+	deleted, Errors := customer.DeleteObject(customerId)
 
-	if deleted != true {
-		RequestContext.JSON(http.StatusNotImplemented, nil)
+	if deleted != true || len(Errors) != 0 {
+		RequestContext.JSON(http.StatusNotImplemented, gin.H{"errors": Errors})
 	}
 	RequestContext.JSON(http.StatusCreated, nil)
 }
@@ -176,6 +202,5 @@ func GetCustomerProfileRestController(context *gin.Context) {
 		context.JSON(http.StatusNotImplemented, nil)
 	}
 
-	context.JSON(http.StatusOK, gin.H{"customerProfile": string(
-		jsonSerializedCustomer[:len(jsonSerializedCustomer)])})
+	context.JSON(http.StatusOK, gin.H{"customerProfile": jsonSerializedCustomer})
 }

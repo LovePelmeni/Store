@@ -1,0 +1,28 @@
+// Google Cloud Continious Delivery Pipeline..
+
+pipeline {
+
+    agent any 
+    load "./credentials.groovy"
+    
+    stages {
+
+        stage("build") {
+            steps{
+
+            }
+        }
+
+        stage("build") {
+            steps {
+
+            }
+        }
+
+        stage("build") {
+            steps{
+
+            }
+        }
+    }
+}

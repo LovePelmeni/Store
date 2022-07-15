@@ -3,7 +3,6 @@ package products
 import (
 	"log"
 	"net/http"
-	"strconv"
 
 	"encoding/json"
 	"errors"
@@ -59,12 +58,12 @@ func GetProductsCatalog(context *gin.Context) {
 
 	_ = Customer
 
-	if customer != nil {
-		CustomerBalance, ParserError := strconv.ParseFloat("10000000.00", 5)
-		if ParserError != nil {
-			DebugLogger.Println("Invalid Customer Balance Format.")
-		}
-	}
+	// if customer != nil {
+	// 	CustomerBalance, ParserError := strconv.ParseFloat("10000000.00", 5)
+	// 	if ParserError != nil {
+	// 		DebugLogger.Println("Invalid Customer Balance Format.")
+	// 	}
+	// }
 
 	Products := models.Database.Table("products").Find(&products)
 	if Products.Error != nil {
