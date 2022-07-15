@@ -4,8 +4,11 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"regexp"
 	_ "strings"
 	"time"
+
+	"strconv"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -42,18 +45,29 @@ var (
 
 /// Models ...
 
-func init() {
+func InitializeLoggers() bool {
 	LogFile, error := os.OpenFile("databaseLogs.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
 	if error != nil {
-		panic("Failed to Initialize Database Log File.")
+		return false
 	}
 
 	DebugLogger = log.New(LogFile, "DEBUG: ", log.Ldate|log.Ltime|log.Lshortfile)
 	InfoLogger = log.New(LogFile, "INFO: ", log.Ldate|log.Ltime|log.Lshortfile)
 	ErrorLogger = log.New(LogFile, "ERROR: ", log.Ldate|log.Ltime|log.Lshortfile)
 	WarnLogger = log.New(LogFile, "WARNING: ", log.Ldate|log.Ltime|log.Lshortfile)
+	return true
 }
 
+func init() {
+	Initialized := InitializeLoggers()
+	if Initialized != true {
+		panic("Failed to Initialize Loggers.")
+	}
+}
+
+// Model Abstractions...
+
+//go:generate -destination=StoreService/mocks/models.go --build_flags=--mod=mod . BaseModel
 type BaseModel interface {
 	// ORM Model Interface with base Methods that every model need to have.
 	Create(ObjectData map[string]interface{}) *BaseModel
@@ -61,19 +75,85 @@ type BaseModel interface {
 	Delete(ObjectId string)
 }
 
+//go:generate -destination=StoreService/mocks/models.go --build_flags=--mod=mod . BaesModelValidator
+type BaseModelValidator interface {
+	// Base Interface for the ORM Model, that allows to
+	GetPatterns() map[string]string
+	Validate(map[string]string) (map[string]string, []string)
+}
+
+type ProductModelValidator struct {
+	Patterns map[string]string // Map key: Product Model Field Name, Value: Regex for validating this field.
+}
+
+func NewProductModelValidator() *ProductModelValidator {
+	Patterns := map[string]string{
+		"OwnerEmail":         "", // default email regex.
+		"ProductName":        "",
+		"ProductDescription": "",
+		"ProductPrice":       "[0-9].[0-9]", // checks that the product price has appropriate format, like: 0.00
+		"Currency":           "",            // Checks that the letters is all upper's, max length 3 letters,
+		// Example "USD", "EUR", "RUB" ...
+	}
+	return &ProductModelValidator{Patterns: Patterns}
+}
+
+func (this *ProductModelValidator) Validate(Data map[string]string) (map[string]string, []string) {
+
+	ValidationErrors := []string{}
+	for Property, Value := range Data {
+		if Valid, Error := regexp.MatchString(this.Patterns[Property], Value); Valid == false || Error != nil {
+			ValidationErrors =
+				append(ValidationErrors, fmt.Sprintf(
+					"Field `%s` is incorrect, Invalid Format.", Property))
+		}
+	}
+	if len(ValidationErrors) != 0 {
+		return nil, ValidationErrors
+	} else {
+		return Data, []string{}
+	}
+}
+
+func (this *ProductModelValidator) GetPatterns() map[string]string {
+	return this.Patterns
+}
+
 type Product struct {
 	gorm.Model
 
-	OwnerEmail         string  `gorm:"VARCHAR(100) NOT NULL"`
-	ProductName        string  `gorm:"VARCHAR(100) NOT NULL"`
-	ProductDescription string  `gorm:"VARCHAR(100) NOT NULL DEFAULT 'This Product Has No Description'"`
-	ProductPrice       float64 `gorm:"NUMERIC(10, 5) NOT NULL"`
-	Currency           string  `gorm:"VARCHAR(10) NOT NULL"`
+	Validator          BaseModelValidator
+	OwnerEmail         string  `gorm:"VARCHAR(100) NOT NULL" json:"OwnerEmail"`
+	ProductName        string  `gorm:"VARCHAR(100) NOT NULL" json:"ProductName"`
+	ProductDescription string  `gorm:"VARCHAR(100) NOT NULL DEFAULT 'This Product Has No Description'" json:"ProductDescription"`
+	ProductPrice       float64 `gorm:"NUMERIC(10, 5) NOT NULL" json:"ProductPrice"`
+	Currency           string  `gorm:"VARCHAR(10) NOT NULL" json:"Currency"`
 }
 
 // Create Controller...
 
-func (this *Product) CreateObject() {
+func (this *Product) CreateObject(ObjectData map[string]string) (bool, []string) {
+
+	ValidatedData, Errors := this.Validator.Validate(ObjectData)
+	if ValidatedData == nil || len(Errors) != 0 {
+		return false, Errors
+	}
+
+	// Setting up Valid Values for the Object...
+	this.ProductName = ValidatedData["ProductName"]
+	this.OwnerEmail = ValidatedData["OwnerEmail"]
+	this.ProductDescription = ValidatedData["ProductDescription"]
+	this.Currency = ValidatedData["Currency"]
+	this.ProductPrice, error = strconv.ParseFloat(ValidatedData["ProductPrice"], 5)
+
+	LocalProductTransaction := Database.Table("products").Save(&this)
+	if LocalProductTransaction.Error != nil {
+		DebugLogger.Println("Failed to Save Product.")
+		return false,
+			[]string{"Failed To Save Product."}
+	} else {
+		return true, []string{}
+	}
 }
 
 // Updating Controller...
@@ -82,41 +162,73 @@ func (this *Product) UpdateObject(ObjId string,
 	UpdatedData struct {
 		ProductName        string
 		ProductDescription string
-	}) bool {
+	}) (bool, []string) {
+
+	ValidatedData, Errors := this.Validator.Validate(map[string]string{
+		"ProductName":        UpdatedData.ProductName,
+		"ProductDescription": UpdatedData.ProductDescription})
+
+	if len(Errors) != 0 || ValidatedData == nil {
+		return false, Errors
+	}
 
 	Updated := Database.Table("products").Where("id = ?", ObjId).Updates(UpdatedData)
 	if Updated.Error != nil {
 		Updated.Rollback()
-		return false
+		return false, []string{Updated.Error.Error()}
 	} else {
 		Updated.Commit()
-		return true
+		return true, []string{}
 	}
 }
 
 // Deleting Controller...
 
-func (this *Product) DeleteObject(ObjId string) bool {
+func (this *Product) DeleteObject(ObjId string) (bool, []string) {
 	Deleted := Database.Table("products").Delete("id = ?", ObjId)
 	if Deleted.Error != nil {
 		Deleted.Rollback()
-		return false
+		return false, []string{Deleted.Error.Error()}
 	} else {
 		Deleted.Commit()
-		return true
+		return true, []string{}
 	}
+}
+
+// Customer ORM Model Validator...
+
+type CustomerModelValidator struct {
+	Patterns map[string]string
+}
+
+func NewCustomerModelValidator() *CustomerModelValidator {
+	Patterns := map[string]string{
+		"Username":  "", // default string regex + max length
+		"Password":  "", // default string regex + max length
+		"Email":     "", // default email regex.
+		"ProductId": "", // valid integer
+	}
+	return &CustomerModelValidator{Patterns: Patterns}
+}
+
+func (this *CustomerModelValidator) Validate(ObjectData map[string]string) (map[string]string, []string) {
+	return ObjectData, []string{}
+}
+
+func (this *CustomerModelValidator) GetPatterns() map[string]string {
+	return this.Patterns
 }
 
 type Customer struct {
 	gorm.Model
 
-	Username          string `gorm:"VARCHAR(100) NOT NULL UNIQUE";json:"Username"`
-	Password          string `gorm:"VARCHAR(100) NOT NULL";json:"Password"`
-	Email             string `gorm:"VARCHAR(100) NOT NULL UNIQUE";json:"Email"`
+	Validator         CustomerModelValidator
+	Username          string `gorm:"VARCHAR(100) NOT NULL UNIQUE" json:"Username"`
+	Password          string `gorm:"VARCHAR(100) NOT NULL" json:"Password"`
+	Email             string `gorm:"VARCHAR(100) NOT NULL UNIQUE" json:"Email"`
 	ProductId         string
-	PurchasedProducts []Product `gorm:"foreignKey:Product;references:ProductId;DEFAULT NULL;constraint:ON DELETE PROTECT;";
-	 							json:"PurchasedProducts;constraint:OnDelete Protect;"`
-	CreatedAt time.Time `gorm:"DATE DEFAULT CURRENT DATE";json:"CreatedAt"`
+	PurchasedProducts []Product `gorm:"foreignKey:Product;references:ProductId;DEFAULT NULL;constraint:OnDelete PROTECT;"`
+	CreatedAt         time.Time `gorm:"DATE DEFAULT CURRENT DATE" json:"CreatedAt"`
 }
 
 func (this *Customer) CreateObject(ObjectData struct {
@@ -143,53 +255,84 @@ func (this *Customer) DeleteObject(ObjId string) bool {
 	return true
 }
 
+type CartModelValidator struct {
+	Patterns map[string]string
+}
+
+func NewCartModelValidator() *CartModelValidator {
+	return &CartModelValidator{Patterns: nil}
+}
+
+func (this *CartModelValidator) Validate(ObjectData map[string]string) (map[string]string, []string) {
+
+	ValidationErrors := []string{}
+	for Property, Value := range ObjectData {
+
+		if Matches, Error := regexp.MatchString(this.Patterns[Property], Value); Matches != true || Error != nil {
+			ValidationErrors = append(
+				ValidationErrors, fmt.Sprintf("Invalid Value for Field `%s`", Property))
+		}
+	}
+	if len(ValidationErrors) != 0 {
+		return nil,
+			ValidationErrors
+	} else {
+		return ObjectData, []string{}
+	}
+}
+
+func (this *CartModelValidator) GetPatterns() {
+
+}
+
 type Cart struct {
 	gorm.Model
 
+	Validator  CartModelValidator
 	CustomerId string
 	ProductId  string
-	Owner      Customer  `gorm:"foreignKey:Customer;references:CustomerId;constraint:OnDelete Cascade;";json:"Owner"`
-	Products   []Product `gorm:"foreignKey:Customer;references:ProductId;constraints:OnDelete PROTECT;";json:"Products"`
+	Owner      Customer  `gorm:"foreignKey:Customer;references:CustomerId;constraint:OnDelete Cascade;" json:"Owner"`
+	Products   []Product `gorm:"foreignKey:Customer;references:ProductId;constraints:OnDelete PROTECT;" json:"Products"`
 }
 
 // Cart Create Controller ..
 
-func (this *Cart) CreateObject(Customer *Customer, Products []Product) *Cart {
+func (this *Cart) CreateObject(Customer *Customer, Products []Product) (*Cart, []string) {
 	// Creating Cart....
 	newCart := Cart{Owner: *Customer, Products: Products}
 	Saved := Database.Table("carts").Save(&newCart)
 	if Saved.Error != nil {
 		Saved.Rollback()
-		return nil
+		return nil, []string{Saved.Error.Error()}
 	} else {
 		Saved.Commit()
-		return &newCart
+		return &newCart, []string{}
 	}
 }
 
 // Cart Update Controller...
 
-func (this *Cart) UpdateObject(ObjId string, UpdatedData struct{ Products []Product }) bool {
+func (this *Cart) UpdateObject(ObjId string, UpdatedData struct{ Products []Product }) (bool, []string) {
 	Updated := Database.Table("carts").Where("id = ?", ObjId).Updates(UpdatedData)
 	if Updated.Error != nil {
 		Updated.Rollback()
-		return false
+		return false, []string{Updated.Error.Error()}
 	} else {
 		Updated.Commit()
-		return true
+		return true, []string{}
 	}
 }
 
 // Cart Delete Controller...
 
-func (this *Cart) DeleteObject(ObjId string) bool {
+func (this *Cart) DeleteObject(ObjId string) (bool, []string) {
 	Deleted := Database.Table("carts").Where(
 		"id = ?", ObjId).Delete("id = ?", ObjId)
 	if Deleted.Error != nil {
 		Deleted.Rollback()
-		return false
+		return false, []string{Deleted.Error.Error()}
 	} else {
 		Deleted.Commit()
-		return true
+		return true, []string{}
 	}
 }
