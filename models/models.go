@@ -121,10 +121,9 @@ func (this *ProductModelValidator) GetPatterns() map[string]string {
 
 type Product struct {
 	gorm.Model
-
-	Validator          BaseModelValidator
-	OwnerEmail         string  `gorm:"VARCHAR(100) NOT NULL" json:"OwnerEmail"`
-	ProductName        string  `gorm:"VARCHAR(100) NOT NULL" json:"ProductName"`
+	Id                 int     `gorm:"BIGSERIAL NOT NULL PRIMARY KEY UNIQUE"`
+	OwnerEmail         string  `gorm:"VARCHAR(100) NOT NULL UNIQUE" json:"OwnerEmail"`
+	ProductName        string  `gorm:"VARCHAR(100) NOT NULL UNIQUE" json:"ProductName"`
 	ProductDescription string  `gorm:"VARCHAR(100) NOT NULL DEFAULT 'This Product Has No Description'" json:"ProductDescription"`
 	ProductPrice       float64 `gorm:"NUMERIC(10, 5) NOT NULL" json:"ProductPrice"`
 	Currency           string  `gorm:"VARCHAR(10) NOT NULL" json:"Currency"`
@@ -132,9 +131,9 @@ type Product struct {
 
 // Create Controller...
 
-func (this *Product) CreateObject(ObjectData map[string]string) (bool, []string) {
+func (this *Product) CreateObject(ObjectData map[string]string, Validator BaseModelValidator) (bool, []string) {
 
-	ValidatedData, Errors := this.Validator.Validate(ObjectData)
+	ValidatedData, Errors := Validator.Validate(ObjectData)
 	if ValidatedData == nil || len(Errors) != 0 {
 		return false, Errors
 	}
@@ -162,9 +161,9 @@ func (this *Product) UpdateObject(ObjId string,
 	UpdatedData struct {
 		ProductName        string
 		ProductDescription string
-	}) (bool, []string) {
+	}, Validator BaseModelValidator) (bool, []string) {
 
-	ValidatedData, Errors := this.Validator.Validate(map[string]string{
+	ValidatedData, Errors := Validator.Validate(map[string]string{
 		"ProductName":        UpdatedData.ProductName,
 		"ProductDescription": UpdatedData.ProductDescription})
 
@@ -219,15 +218,16 @@ func (this *CustomerModelValidator) GetPatterns() map[string]string {
 	return this.Patterns
 }
 
+// gorm:"foreignKey:OrderedGoodsId;references:Id;
+
 type Customer struct {
 	gorm.Model
-
-	Validator         CustomerModelValidator
+	Id                int    `gorm:"BIGSERIAL NOT NULL UNIQUE PRIMARY KEY"`
 	Username          string `gorm:"VARCHAR(100) NOT NULL UNIQUE" json:"Username"`
 	Password          string `gorm:"VARCHAR(100) NOT NULL" json:"Password"`
 	Email             string `gorm:"VARCHAR(100) NOT NULL UNIQUE" json:"Email"`
 	ProductId         string
-	PurchasedProducts []Product `gorm:"foreignKey:Product;references:ProductId;DEFAULT NULL;constraint:OnDelete PROTECT;"`
+	PurchasedProducts Product   `gorm:"foreignKey:ProductId;references:Id;default:null;" json:"PurchasedProducts"`
 	CreatedAt         time.Time `gorm:"DATE DEFAULT CURRENT DATE" json:"CreatedAt"`
 }
 
@@ -236,23 +236,35 @@ func (this *Customer) CreateObject(ObjectData struct {
 	Password  string
 	Email     string
 	CreatedAt time.Time
-}, PurchasedProducts ...[]Product) *Customer {
-	return &Customer{}
+}, Validator BaseModelValidator, PurchasedProducts ...[]Product) (*Customer, []string) {
+	return &Customer{}, []string{}
 }
 
-func (this *Customer) UpdateObject(ObjId string, UpdatedData struct{ Password string }) bool {
-	Updated := Database.Table("customers").Updates(UpdatedData)
+func (this *Customer) UpdateObject(
+
+	ObjId string,
+	UpdatedData struct{ Password string },
+	Validator BaseModelValidator,
+
+) (bool, []string) {
+
+	ValidatedData, Errors := Validator.Validate(map[string]string{"Password": UpdatedData.Password})
+	if Errors != nil {
+		return false, Errors
+	}
+
+	Updated := Database.Table("customers").Updates(ValidatedData)
 	if Updated.Error != nil {
 		ErrorLogger.Println(
 			"Failed To Update Customer.")
-		return false
+		return false, []string{Updated.Error.Error()}
 	} else {
-		return true
+		return true, []string{}
 	}
 }
 
-func (this *Customer) DeleteObject(ObjId string) bool {
-	return true
+func (this *Customer) DeleteObject(ObjId string) (bool, []string) {
+	return true, []string{}
 }
 
 type CartModelValidator struct {
@@ -287,19 +299,18 @@ func (this *CartModelValidator) GetPatterns() {
 
 type Cart struct {
 	gorm.Model
-
-	Validator  CartModelValidator
+	Id         int
 	CustomerId string
 	ProductId  string
-	Owner      Customer  `gorm:"foreignKey:Customer;references:CustomerId;constraint:OnDelete Cascade;" json:"Owner"`
-	Products   []Product `gorm:"foreignKey:Customer;references:ProductId;constraints:OnDelete PROTECT;" json:"Products"`
+	Owner      Customer `gorm:"foreignKey:CustomerId;references:Id;constraint:OnDelete:Cascade;" json:"Owner"`
+	Products   Product  `gorm:"foreignKey:ProductId;references:Id;" json:"Products"`
 }
 
 // Cart Create Controller ..
 
 func (this *Cart) CreateObject(Customer *Customer, Products []Product) (*Cart, []string) {
 	// Creating Cart....
-	newCart := Cart{Owner: *Customer, Products: Products}
+	newCart := Cart{Owner: *Customer, Products: Products[0]}
 	Saved := Database.Table("carts").Save(&newCart)
 	if Saved.Error != nil {
 		Saved.Rollback()

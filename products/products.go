@@ -7,6 +7,10 @@ import (
 	"encoding/json"
 	"errors"
 
+	"fmt"
+	"reflect"
+	"sync"
+
 	"github.com/LovePelmeni/OnlineStore/StoreService/authentication"
 	"github.com/LovePelmeni/OnlineStore/StoreService/models"
 	"github.com/gin-gonic/gin"
@@ -19,13 +23,72 @@ var (
 	InfoLogger  *log.Logger
 )
 
+var product models.Product
+
+func InitializeLoggers() {}
+
+func init() {}
+
 // CUD Rest Controllers...
 
-func CreateProduct(context *gin.Context) {}
+func CreateProduct(context *gin.Context) {
+
+	InvalidFieldsErrors := []string{}
+	ModelPostValues := reflect.ValueOf(context.PostForm)
+	ModelPostNames := reflect.TypeOf(context.PostForm)
+
+	group := sync.WaitGroup{}
+
+	// Validating
+	go func() {
+		group.Add(1)
+
+		for PropertyIndex := 1; PropertyIndex < reflect.TypeOf(context.PostForm).NumField(); PropertyIndex++ {
+			if Valid := ModelPostValues.Field(PropertyIndex).IsValid; Valid() != false {
+				if len(ModelPostValues.Field(PropertyIndex).String()) == 0 {
+					InvalidFieldsErrors = append(InvalidFieldsErrors, fmt.Sprintf("Invalid Value for Field `%s`",
+						ModelPostNames.Field(PropertyIndex).Name))
+				}
+			} else {
+				continue
+			}
+		}
+		group.Done()
+	}()
+	group.Wait()
+
+	if len(InvalidFieldsErrors) != 0 {
+		context.JSON(http.StatusBadRequest, gin.H{"errors": InvalidFieldsErrors})
+	}
+
+	ProductValidator := models.NewProductModelValidator()
+	newProductCreated, Errors := product.CreateObject(
+		map[string]string{
+			"ProductName":        context.PostForm("ProductName"),
+			"ProductDescription": context.PostForm("ProductDescription"),
+			"ProductPrice":       context.PostForm("ProductPrice"),
+			"Currency":           context.PostForm("Currency"),
+		},
+		ProductValidator,
+	)
+	if newProductCreated == true || len(Errors) != 0 {
+		context.JSON(http.StatusOK, gin.H{"Errors": Errors})
+	}
+}
 
 func UpdateProduct(context *gin.Context) {}
 
-func DeleteProduct(context *gin.Context) {}
+func DeleteProduct(context *gin.Context) {
+
+	ProductId := context.Query("ProductId")
+	Deleted, Errors := product.DeleteObject(ProductId)
+	if Deleted != true || len(Errors) != 0 {
+		context.JSON(
+			http.StatusNotImplemented, gin.H{"errors": Errors})
+	} else {
+		context.JSON(http.StatusOK, nil)
+	}
+}
 
 // Getter Rest Controllers...
 

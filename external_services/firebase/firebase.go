@@ -11,7 +11,7 @@ import (
 
 	firebase "firebase.google.com/go"
 	"firebase.google.com/go/db"
-	"github.com/LovePelmeni/StoreService/external_services/orders"
+	"github.com/LovePelmeni/OnlineStore/StoreService/external_services/orders"
 )
 
 // Collection Properties

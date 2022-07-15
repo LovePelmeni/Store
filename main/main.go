@@ -72,7 +72,7 @@ func main() {
 	// CORS CONFIGURATION
 	router.Use(cors.New(cors.Config{
 
-		AllowOrigins:     []string{},
+		AllowOrigins:     []string{fmt.Sprintf("http://%s:%s", EMAIL_APPLICATION_HOST, EMAIL_APPLICATION_PORT)},
 		AllowMethods:     []string{"*"},
 		AllowHeaders:     []string{"*"},
 		AllowCredentials: true,
