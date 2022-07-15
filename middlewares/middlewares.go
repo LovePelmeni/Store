@@ -43,7 +43,7 @@ func JwtAuthenticationMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		if valid := authentication.CheckValidJwtToken(jwtToken); valid != nil {
+		if validationError := authentication.CheckValidJwtToken(jwtToken); validationError != nil {
 			return
 		}
 		context.Next()

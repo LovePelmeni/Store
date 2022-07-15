@@ -48,4 +48,3 @@ message PaymentIntentResponse {
 message RefundResponse {
   string RefundId = 1;
 }
-

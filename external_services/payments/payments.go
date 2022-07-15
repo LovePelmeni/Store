@@ -36,7 +36,7 @@ func init() {
 
 // Abstractions...
 
-// Credentials Interfaces...
+//go:generate -destination=StoreService/mocks/payments.go --build_flags=--mod=mod . PaymentIntentCredentialsInterface
 
 type PaymentIntentCredentialsInterface interface {
 	// Payment Intent Credentials Interface, Describes the Payment Intent Document..
@@ -46,6 +46,8 @@ type PaymentIntentCredentialsInterface interface {
 	Validate() (*PaymentIntentCredentialsInterface, []error)
 	GetCredentials() (*PaymentIntentCredentialsInterface, []error)
 }
+
+//go:generate -destination=StoreService/mocks/payments.go --build_flags=--mod=mod . PaymentSessionCredentialsInterface
 
 type PaymentSessionCredentialsInterface interface {
 	// Payment Session Credentials, Describe the Payment Session Document...
@@ -62,6 +64,8 @@ type PaymentSessionCredentialsInterface interface {
 	GetCredentials() (*PaymentSessionCredentialsInterface, []error)
 }
 
+//go:generate -destination=StoreService/mocks/payments.go --build_flags=--mod=mod . PaymentRefundCredentialsInterface
+
 type PaymentRefundCredentialsInterface interface {
 	// Controller Interface, represents Payment Refund Model, Requires Following Params.
 	// - Payment Id of ORM Model Object the Object That Was Created, during Successful Payment.
@@ -71,6 +75,8 @@ type PaymentRefundCredentialsInterface interface {
 
 // Controllers Interfaces...
 
+//go:generate -destination=StoreService/mocks/payments.go --build_flags=--mod=mod . PaymentIntentControllerInterface
+
 type PaymentIntentControllerInterface interface {
 	// Controller Interface Responsible for handling Payment Intents.
 	// Requires Following Params to be Passed as a structure inside the implementation.
@@ -78,12 +84,16 @@ type PaymentIntentControllerInterface interface {
 	CreatePaymentIntent(PaymentIntentCredentials *PaymentIntentCredentialsInterface) (map[string]string, error)
 }
 
+//go:generate -destination=StoreService/mocks/payments.go --build_flags=--mod=mod . PaymentSessionControllerInterface
+
 type PaymentSessionControllerInterface interface {
 	// Controller Interface Responsible for handling Payment Sessions.
 	// Requires Following Params to be Passed as a Structure Inside the Implementation.
 	// - grpc Payment Session Client.
 	CreatePaymentSession(PaymentSessionCredentials *PaymentSessionCredentialsInterface) (map[string]string, error)
 }
+
+//go:generate -destination=StoreService/mocks/payments.go --build_flags=--mod=mod . PaymentRefundControllerInterface
 
 type PaymentRefundControllerInterface interface {
 	// Controller Interface Responsible for handling Payment Refunds..
