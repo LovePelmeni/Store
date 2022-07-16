@@ -35,7 +35,7 @@ services:
     command:
       - -p 5435 
     networks:
-      - global_store_network 
+      - global_store_network  
 
 networks:
   global_store_network:

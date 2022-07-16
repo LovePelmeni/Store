@@ -11,7 +11,8 @@ RUN apk add git --no-cache
 RUN apk add build-base 
 
 # Copying existed sources..
-COPY ./go.mod ./ && COPY ./go.sum ./
+COPY ./go.mod ./ 
+COPY ./go.sum ./
 COPY . .
 
 # Installing Dependencies + creating Vendor Directory.. + Running Tests...
