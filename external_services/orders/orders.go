@@ -3,6 +3,7 @@ package orders
 import (
 	"log"
 	"os"
+	"strings"
 
 	"errors"
 	"sync"
@@ -16,6 +17,7 @@ import (
 
 	"github.com/LovePelmeni/OnlineStore/StoreService/external_services/orders/firebase"
 	"github.com/LovePelmeni/OnlineStore/StoreService/models"
+	circuitbreaker "github.com/mercari/go-circuitbreaker"
 )
 
 var (
@@ -294,18 +296,37 @@ func (this *OrderCredentials) GetCredentials() (*OrderCredentials, []error) {
 	return OrderCredentials, nil
 }
 
+
+
+
 type OrderController struct {
 	FirebaseManager firebase.FirebaseDatabaseOrderManagerInterface // for managing orders...
-	CurcuitBreaker  *curcuitbreaker.New
+	CircuitBreaker  *circuitbreaker.CircuitBreaker 
 }
 
 func NewOrderController(FirebaseOrderManager *firebase.FirebaseDatabaseOrderManager) *OrderController {
-	return &OrderController{FirebaseManager: FirebaseOrderManager,
-		CurcuitBreaker: curcuitbreaker.New()}
+
+	return &OrderController{
+		FirebaseManager: FirebaseOrderManager,
+
+		CurcuitBreaker: circuitbreaker.New(
+
+			circuitbreaker.WithOpenTimeout(20),
+			circuitbreaker.WithHalfOpenMaxSuccesses(10),
+			circuitbreaker.WithOnStateChangeHookFn(func(old_state, new_state circuitbreaker.State){
+				if hasPrefix := strings.HasPrefix(strings.ToLower(
+				string(new_state)), "cl"); hasPrefix == true {} else{ // check if state has been changed to close..
+
+				ErrorLogger.Println(fmt.Sprintf(
+				"CircuitBreaker Is Opened. New State: %s", new_state))}
+			}),
+	)}
 }
 
 func (this *OrderController) CreateOrder(OrderCredentials OrderCredentialsInterface) (bool, []error) {
 
+
+	if this.CircuitBreaker.Ready() != true {return false, []error{errors.New("Service Is Unavailable")}}
 	OrderCredentials, Errors := OrderCredentials.GetCredentials() // Validating Credentials First..
 	if len(Errors) != 0 {
 		return false, Errors
@@ -314,12 +335,15 @@ func (this *OrderController) CreateOrder(OrderCredentials OrderCredentialsInterf
 	BreakerContext, TimeoutError := context.WithTimeout(context.Background(), time.Second*10)
 	defer TimeoutError()
 
+
 	if Created, Error := this.CurcuitBreaker.Do(BreakerContext, func() (interface{}, error) {
 		Response, Error := this.FirebaseManager.CreateOrder(OrderCredentials)
+
 		if Response != true || Error != nil {
-			this.CurcuitBreaker.Open()
+			this.CircuitBreaker.FailWithContext(BreakerContext)
 			return false, Error
 		}
+		this.CircuitBreaker.Done(BreakerContext)
 		return true, nil
 
 	}); Created != true || Error != nil {
@@ -330,10 +354,16 @@ func (this *OrderController) CreateOrder(OrderCredentials OrderCredentialsInterf
 
 func (this *OrderController) CancelOrder(OrderId string) (bool, error) {
 
-	if Deleted, Error := this.FirebaseManager.CancelOrder(OrderId); Deleted != true || Error != nil {
+	// Checking if circuit breaker works properly..
+	if this.CircuitBreaker.Ready() != true {return false, errors.New("Service is Unavailable.")}
+
+	context := context.WithTimeout(context.Background(), time.Second * 10)
+	if Response, Error := this.CircuitBreaker.Do(context, func() (interface{}, error) { 
+		if Deleted, Error := this.FirebaseManager.CancelOrder(OrderId); Deleted != true || Error != nil {
 		ErrorLogger.Println("Failed to Cancel Order.. Reason: " + Error.Error())
 		return false, Error
 	} else {
+		this.CircuitBreaker.Done(context)
 		return true, nil
-	}
+	}}); 
 }
