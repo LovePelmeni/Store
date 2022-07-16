@@ -107,7 +107,8 @@ func (this *grpcEmailClient) getClient() (*grpcControllers.NewEmailClient, error
 	if Error != nil {ErrorLogger.Println(
 	"Failed to Connect To Email Grpc Server: Error " + Error.Error());
 
-    this.CircuitBreaker.FailWithContext(context)}else{this.CircuitBreaker.Done(context)}
+    this.CircuitBreaker.FailWithContext(context)}else{
+	this.CircuitBreaker.Done(context, nil)}
 	return grpcClient, Error
 	})
 }
