@@ -121,7 +121,6 @@ func main() {
 	router.Group("get/most/").Use(middlewares.SetAuthHeaderMiddleware())
 	{
 		router.GET("/popular/week/products", products.GetTopWeekProducts) // AllowAny
-		router.GET("/liked/products/", products.GetMostLikedProducts)
 	}
 
 	DebugLogger.Println("Running HTTP Server.")

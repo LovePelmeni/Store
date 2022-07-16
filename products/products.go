@@ -11,11 +11,13 @@ import (
 	"reflect"
 	"sync"
 
+	"io"
+	"os"
+
 	"github.com/LovePelmeni/OnlineStore/StoreService/authentication"
 	"github.com/LovePelmeni/OnlineStore/StoreService/models"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
-	"io"
 )
 
 var (
@@ -81,43 +83,50 @@ func UpdateProduct(context *gin.Context) {
 
 	productId := context.Query("productId")
 	bodyData, Error := io.ReadAll(context.Request.Body)
-	var InvalidFields []error 
+	var InvalidFields []error
 
-	if Error != nil {InfoLogger.Println(
-	"Failed to parse Product Form Data."); context.JSON(http.StatusBadRequest, nil)}
+	if Error != nil {
+		InfoLogger.Println(
+			"Failed to parse Product Form Data.")
+		context.JSON(http.StatusBadRequest, nil)
+	}
 
 	Product := models.Database.Table("products").Where("id = ?", productId) // Receives the object..
-	if errors.Is(Product.Error, gorm.ErrRecordNotFound) {context.JSON(http.StatusNotFound, nil)} 
-
+	if errors.Is(Product.Error, gorm.ErrRecordNotFound) {
+		context.JSON(http.StatusNotFound, nil)
+	}
 
 	group := sync.WaitGroup{}
 
 	go func() {
 
 		group.Add(1)
-		
-			structuredFields := reflect.TypeOf(&bodyData)
-			for PropertyIndex := 1; PropertyIndex < structuredFields.NumField(); PropertyIndex ++ {
 
-				if len(reflect.ValueOf(structuredFields.Field(
+		structuredFields := reflect.TypeOf(&bodyData)
+		for PropertyIndex := 1; PropertyIndex < structuredFields.NumField(); PropertyIndex++ {
+
+			if len(reflect.ValueOf(structuredFields.Field(
 				PropertyIndex)).String()) == 0 { // Checking if the Field Value is empty...
 
 				InvalidFields = append(InvalidFields, errors.New(fmt.Sprintf("Invalid Value for Field `%s`",
-				structuredFields.Field(PropertyIndex).Name)))} 
+					structuredFields.Field(PropertyIndex).Name)))
+			}
 
-		group.Done()
-	}}()
+			group.Done()
+		}
+	}()
 
 	group.Wait()
 
 	if len(InvalidFields) != 0 {
 
-	serializedContext, Error := json.Marshal(InvalidFields); _ = Error
-	context.JSON(http.StatusBadRequest, gin.H{"InvalidFields": serializedContext})}
-	
+		serializedContext, Error := json.Marshal(InvalidFields)
+		_ = Error
+		context.JSON(http.StatusBadRequest, gin.H{"InvalidFields": serializedContext})
+	}
+
 	context.JSON(http.StatusCreated, nil)
 }
-
 
 func DeleteProduct(context *gin.Context) {
 
@@ -135,10 +144,9 @@ func DeleteProduct(context *gin.Context) {
 
 func GetTopWeekProducts(context *gin.Context) {
 	productsQuery := models.Database.Table(
-	"products").Order("likes desc").Limit(10)
+		"products").Order("likes desc").Limit(10)
 	context.JSON(http.StatusOK, gin.H{"query": productsQuery})
 }
-
 
 func GetProductsCatalog(context *gin.Context) {
 
@@ -167,27 +175,31 @@ func GetProductsCatalog(context *gin.Context) {
 
 	_ = Customer
 
-
 	group := sync.WaitGroup{}
 
 	var CustomerPaymentProfileData map[string]string
 
-	go func(){
+	go func() {
 		group.Add(1)
 
 		client := http.Client{}
-		requestUrl := url.URL(fmt.Sprintf("http://%s:%s/get/customer/info/",
-	    os.Getenv("PAYMENT_APPLICATION_HOST")))
-		requestUrl.Query("CustomerId") = string(customer.ID)
-		request, Error := http.NewRequest("GET", requestUrl)
+		requestUrl := fmt.Sprintf("http://%s:%s/get/customer/info/",
+			os.Getenv("PAYMENT_APPLICATION_HOST"), os.Getenv("PAYMENT_APPLICATION_PORT"))
+
+		requestUrl += fmt.Sprintf("?customerId=%s", string(customer.ID))
+		request, Error := http.NewRequest("GET", requestUrl, nil)
+		if Error != nil {
+			ErrorLogger.Println("Failed To Initialize Request.")
+		}
+
 		request.Header.Set("Access-Control-Allow-Origin", "*")
-		Response, Error := client.Do(request) 
+		Response, Error := client.Do(request)
 
 		SerializedPaymentProfileInfo, Error := io.ReadAll(Response.Body)
 		DecodeError := json.Unmarshal(SerializedPaymentProfileInfo, &CustomerPaymentProfileData)
-		_ = DecodeError 
+		_ = DecodeError
 
-	}() // Parsing Customer Balance.. 
+	}() // Parsing Customer Balance..
 
 	Products := models.Database.Table("products").Find(&products)
 	if Products.Error != nil {
@@ -205,7 +217,6 @@ func GetProductsCatalog(context *gin.Context) {
 	}
 	context.JSON(http.StatusOK, gin.H{"products": AnnotatedProducts})
 }
-
 
 func GetProduct(context *gin.Context) {
 

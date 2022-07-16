@@ -17,6 +17,7 @@ import (
 
 	"github.com/LovePelmeni/OnlineStore/StoreService/external_services/orders/firebase"
 	"github.com/LovePelmeni/OnlineStore/StoreService/models"
+	"github.com/go-redis/redis"
 	circuitbreaker "github.com/mercari/go-circuitbreaker"
 )
 
@@ -67,6 +68,12 @@ type OrderCredentialsInterface interface {
 	Validate() (bool, error)
 	GetCredentials() (OrderCredentialsInterface, []error)
 }
+
+type OrderSessionInterface interface {
+	// Interface that represents Order Session, 
+	GetSession() (map[string]string, error) // Returns Json Structure, Possible errors: NotFound, Timeout
+	SetParams() (bool, error) // Returns bool if params has been updated successfully.
+} 
 
 //go:generate -destination=StoreService/mocks/orders.go . OrderControllerInterface
 type OrderControllerInterface interface {
@@ -297,6 +304,43 @@ func (this *OrderCredentials) GetCredentials() (*OrderCredentials, []error) {
 }
 
 
+type OrderSession struct {
+	SessionId string 
+	Timeout *time.Time
+	RedisClient *redis.CloudRedisClient 
+	SessionCredentials *OrderCredentialsInterface // data that is stored in the order Session..
+}
+
+func NewOrderSession() *OrderSession {
+	Client, Error := GetRedisClient()
+	if Error != nil {return nil}
+	return &OrderSession{RedisClient: Client}
+}
+
+func (this *OrderSession) generateSessionId() (string, error) {}
+
+func (this *OrderSession) Initialize() {
+	SessionJsonStruct := struct{}{} // struct that represents Session...
+	GeneratedSessionId := this.generateSessionId()
+	SetupSession, Error := this.Client.Set(fmt.Sprintf(
+	"Session-%s", GeneratedSessionId))
+	if SetupSession != false && Error == nil {this.SessionId = GeneratedSessionId}
+
+}
+func (this *OrderSession) SetParams(Params map[string]string) (bool, error) {
+
+	var session this 
+	Session, SessionError := this.RedisClient.Get("Session-" + this.generateSessionId)
+	if errors.Is(SessionError, redis.TxFailedErr) {return false, SessionError}
+
+	SessionStructedFields := reflect.TypeOf(&Session)
+	for Property, Value := range Params {
+		SessionStructedFields.FieldByName(Property) = Value
+	}
+	Set, Error := this.RedisClient.Set(Session, this.Timeout)
+	if Error != nil {return false, Error}
+	return true, nil
+}
 
 
 type OrderController struct {
