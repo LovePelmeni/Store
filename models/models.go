@@ -64,7 +64,6 @@ func init() {
 		panic("Failed to Initialize Loggers.")
 	}
 }
-
 // Model Abstractions...
 
 //go:generate -destination=StoreService/mocks/models.go --build_flags=--mod=mod . BaseModel
@@ -82,9 +81,22 @@ type BaseModelValidator interface {
 	Validate(map[string]string) (map[string]string, []string)
 }
 
+
+
+// Because of microservice architecture, there is still some models in the bounded contexts,
+// that requires to be initialized/created during the local transaction... 
+// That's why the interfaces down below helps to achieve this sort of functionality, to provide quick distributed service commication ...
+
+
+
+
+
+
+
 type ProductModelValidator struct {
 	Patterns map[string]string // Map key: Product Model Field Name, Value: Regex for validating this field.
 }
+
 
 func NewProductModelValidator() *ProductModelValidator {
 	Patterns := map[string]string{
@@ -128,10 +140,14 @@ type Product struct {
 	ProductPrice       float64 `gorm:"NUMERIC(10, 5) NOT NULL" json:"ProductPrice"`
 	Currency           string  `gorm:"VARCHAR(10) NOT NULL" json:"Currency"`
 }
-
 // Create Controller...
 
-func (this *Product) CreateObject(ObjectData map[string]string, Validator BaseModelValidator) (bool, []string) {
+func (this *Product) CreateObject(
+
+	ObjectData map[string]string,
+	Validator BaseModelValidator, 
+
+	) (bool, []string) {
 
 	ValidatedData, Errors := Validator.Validate(ObjectData)
 	if ValidatedData == nil || len(Errors) != 0 {
@@ -180,7 +196,6 @@ func (this *Product) UpdateObject(ObjId string,
 		return true, []string{}
 	}
 }
-
 // Deleting Controller...
 
 func (this *Product) DeleteObject(ObjId string) (bool, []string) {
@@ -193,6 +208,9 @@ func (this *Product) DeleteObject(ObjId string) (bool, []string) {
 		return true, []string{}
 	}
 }
+
+
+
 
 // Customer ORM Model Validator...
 
@@ -218,7 +236,6 @@ func (this *CustomerModelValidator) GetPatterns() map[string]string {
 	return this.Patterns
 }
 
-// gorm:"foreignKey:OrderedGoodsId;references:Id;
 
 type Customer struct {
 	gorm.Model
@@ -267,7 +284,14 @@ func (this *Customer) DeleteObject(ObjId string) (bool, []string) {
 	return true, []string{}
 }
 
-type CartModelValidator struct {
+
+
+
+
+
+
+type CartModelValidator struct { 
+	// Validator Struct, that Represents Validator For `Cart` Model
 	Patterns map[string]string
 }
 
@@ -293,9 +317,11 @@ func (this *CartModelValidator) Validate(ObjectData map[string]string) (map[stri
 	}
 }
 
-func (this *CartModelValidator) GetPatterns() {
-
+func (this *CartModelValidator) GetPatterns() map[string]string {
+	return this.Patterns 
 }
+
+
 
 type Cart struct {
 	gorm.Model
@@ -308,7 +334,7 @@ type Cart struct {
 
 // Cart Create Controller ..
 
-func (this *Cart) CreateObject(Customer *Customer, Products []Product) (*Cart, []string) {
+func (this *Cart) CreateObject(Customer *Customer, Products []Product, Validator *BaseModelValidator) (*Cart, []string) {
 	// Creating Cart....
 	newCart := Cart{Owner: *Customer, Products: Products[0]}
 	Saved := Database.Table("carts").Save(&newCart)
@@ -323,7 +349,7 @@ func (this *Cart) CreateObject(Customer *Customer, Products []Product) (*Cart, [
 
 // Cart Update Controller...
 
-func (this *Cart) UpdateObject(ObjId string, UpdatedData struct{ Products []Product }) (bool, []string) {
+func (this *Cart) UpdateObject(ObjId string, UpdatedData struct{ Products []Product}, Validator *BaseModelValidator) (bool, []string) {
 	Updated := Database.Table("carts").Where("id = ?", ObjId).Updates(UpdatedData)
 	if Updated.Error != nil {
 		Updated.Rollback()

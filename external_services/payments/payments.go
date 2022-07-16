@@ -3,10 +3,15 @@ package payments
 import (
 	"errors"
 	"log"
+	"net/http"
 	"os"
 	"sync"
 
+	"context"
+	"time"
+
 	paymentClients "github.com/LovePelmeni/OnlineStore/StoreService/external_services/payments/clients"
+	curcuitbreaker "github.com/mercari/go-cuircuitbreaker"
 )
 
 var (
@@ -151,14 +156,41 @@ func (this *PaymentRefundCredentials) GetCredentials() (*PaymentRefundCredential
 // Controller Implementations
 
 type PaymentIntentController struct {
-	Client *paymentClients.PaymentIntentClientInterface
+	Client         paymentClients.PaymentIntentClientInterface
+	CurcuitBreaker *curcuitbreaker.New
 }
 
 func NewPaymentIntentController(Client *paymentClients.PaymentIntentClientInterface) *PaymentIntentController {
-	return &PaymentIntentController{Client: Client}
+	return &PaymentIntentController{Client: *Client,
+		CurcuitBreaker: curcuitbreaker.New()}
 }
 
-func (this *PaymentIntentController) CreatePaymentIntent(Credentials *PaymentIntentCredentials) (map[string]string, error)
+func (this *PaymentIntentController) CreatePaymentIntent(Credentials *PaymentIntentCredentials) (map[string]string, []error) {
+
+	paymentCredentials, ValidationErrors := Credentials.Validate()
+	if len(ValidationErrors) != 0 {
+		return nil, ValidationErrors
+	}
+	RequestContext, CancelError := context.WithTimeout(context.Background(), time.Second*10) // Initializing Request Context..
+
+	PaymentResponseIntentId, Error := this.CurcuitBreaker.Do(RequestContext, func() (interface{}, error) {
+		PaymentResponse, Error := this.Client.CreatePaymentIntent(
+			RequestContext, paymentCredentials)
+		if Error != nil {
+			InfoLogger.Println(
+				"Failure Response from Payment Grpc Server..")
+		}
+
+		if errors.Is(Error, http.ErrHandlerTimeout) {
+			this.CurcuitBreaker.Open()
+		}
+		// Opening Curcuit Breaker In order to prevent any Potential Errors.
+		return PaymentResponse.PaymentIntentId, Error
+	})
+
+	defer CancelError()
+	return map[string]string{"PaymentIntentId": PaymentResponseIntentId}, Error
+}
 
 type PaymentSessionController struct {
 	Client *paymentClients.PaymentSessionClientInterface
@@ -168,7 +200,7 @@ func NewPaymentSessionController(Client *paymentClients.PaymentSessionClientInte
 	return &PaymentSessionController{Client: Client}
 }
 
-func (this *PaymentSessionController) CreatePaymentSession(Credentials *PaymentSessionCredentials) (map[string]string, error)
+func (this *PaymentSessionController) CreatePaymentSession(Credentials *PaymentSessionCredentials) (map[string]string, []error)
 
 type PaymentRefundController struct {
 	Client *paymentClients.PaymentRefundClientInterface
@@ -178,4 +210,4 @@ func NewPaymentRefundController(Client *paymentClients.PaymentRefundClientInterf
 	return &PaymentRefundController{Client: Client}
 }
 
-func (this *PaymentRefundController) CreateRefundIntent(Credentials *PaymentRefundCredentials) (map[string]string, error)
+func (this *PaymentRefundController) CreateRefundIntent(Credentials *PaymentRefundCredentials) (map[string]string, []error)

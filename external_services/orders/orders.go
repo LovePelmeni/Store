@@ -11,6 +11,9 @@ import (
 	"reflect"
 	"regexp"
 
+	"context"
+	"time"
+
 	"github.com/LovePelmeni/OnlineStore/StoreService/external_services/orders/firebase"
 	"github.com/LovePelmeni/OnlineStore/StoreService/models"
 )
@@ -49,7 +52,6 @@ func init() {
 	if !Initialized && Error != nil {
 		panic(Error)
 	}
-
 }
 
 // Abstractions...
@@ -70,6 +72,13 @@ type OrderControllerInterface interface {
 	// Related to the `Orders`
 	CreateOrder(OrderCredentials OrderCredentialsInterface) (bool, []error)
 	CancelOrder(OrderId string) (bool, error)
+}
+
+type OrderCurcuitBreakerInterface interface {
+	// Interface that implements curcuit breaker for the Order Interface gRPC Calls.
+	Open() (bool, error)
+	HalfOpen() (bool, error)
+	Close() (bool, error)
 }
 
 // Implementations...
@@ -287,10 +296,12 @@ func (this *OrderCredentials) GetCredentials() (*OrderCredentials, []error) {
 
 type OrderController struct {
 	FirebaseManager firebase.FirebaseDatabaseOrderManagerInterface // for managing orders...
+	CurcuitBreaker  *curcuitbreaker.New
 }
 
 func NewOrderController(FirebaseOrderManager *firebase.FirebaseDatabaseOrderManager) *OrderController {
-	return &OrderController{FirebaseManager: FirebaseOrderManager}
+	return &OrderController{FirebaseManager: FirebaseOrderManager,
+		CurcuitBreaker: curcuitbreaker.New()}
 }
 
 func (this *OrderController) CreateOrder(OrderCredentials OrderCredentialsInterface) (bool, []error) {
@@ -300,8 +311,18 @@ func (this *OrderController) CreateOrder(OrderCredentials OrderCredentialsInterf
 		return false, Errors
 	}
 
-	if Created, Error := this.FirebaseManager.CreateOrder(OrderCredentials); Created != true || Error != nil {
-		ErrorLogger.Println("Failed to Create Order.. Reason: " + Error.Error())
+	BreakerContext, TimeoutError := context.WithTimeout(context.Background(), time.Second*10)
+	defer TimeoutError()
+
+	if Created, Error := this.CurcuitBreaker.Do(BreakerContext, func() (interface{}, error) {
+		Response, Error := this.FirebaseManager.CreateOrder(OrderCredentials)
+		if Response != true || Error != nil {
+			this.CurcuitBreaker.Open()
+			return false, Error
+		}
+		return true, nil
+
+	}); Created != true || Error != nil {
 		return false, []error{Error}
 	}
 	return true, nil

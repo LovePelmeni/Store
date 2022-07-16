@@ -3,8 +3,16 @@ package grpc_clients
 import (
 	"log"
 
+	"fmt"
+	"os"
+
 	grpcControllers "github.com/LovePelmeni/OnlineStore/StoreService/external_services/payments/proto"
 	"google.golang.org/grpc"
+)
+
+var (
+	PAYMENT_GRPC_SERVER_HOST = os.Getenv("PAYMENT_GRPC_SERVER_HOST")
+	PAYMENT_GRPC_SERVER_PORT = os.Getenv("PAYMENT_GRPC_SERVER_PORT")
 )
 
 var (
@@ -51,10 +59,17 @@ type GrpcServerConnection struct {
 	ServerPort string
 }
 
-func NewGrpcServerConnection(Host string, Port string) *GrpcServerConnection {
-	return &GrpcServerConnection{ServerHost: Host, ServerPort: Port}
+func NewGrpcServerConnection(grpcServerHost string, grpcServerPort string) *GrpcServerConnection {
+	return &GrpcServerConnection{ServerHost: grpcServerHost, ServerPort: grpcServerPort}
 }
-func GetConnection() (*grpc.ClientConn, error)
+func (this *GrpcServerConnection) GetConnection() (*grpc.ClientConn, error) {
+	Connection, Error := grpc.Dial(
+		fmt.Sprintf("%s:%s", this.ServerHost, this.ServerPort))
+	if Connection == nil || Error != nil {
+		panic("Failed to Connect To Payment Grpc Server.")
+	}
+	return Connection, nil
+}
 
 type PaymentIntentClient struct {
 	Connection *GrpcServerConnectionInterface

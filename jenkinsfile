@@ -14,7 +14,7 @@ pipeline {
                 Going to the Testing Stage.."
             }
         }
-
+        
         stage("test"){
             steps{
                 // checking for application health..

@@ -1,27 +1,54 @@
 // Google Cloud Continious Delivery Pipeline..
-
 pipeline {
 
     agent any 
     load "./credentials.groovy"
-    
+
     stages {
 
         stage("build") {
             steps{
-
+                sh "docker build ${DOCKER_FILE_PATH} --name ${DOCKER_IMAGE_DESIRED_NAME}"
+                sh "echo 'Image has beenImage has been built successfully.. Running Testing Stage'"
             }
         }
 
-        stage("build") {
+        stage("test") {
             steps {
-
+                // Testing Stage Goes There.
             }
         }
 
-        stage("build") {
+        stage("docker-deployment") {
             steps{
+            sh "docker tag new_versioned_image ${DOCKERHUB_REPOSITORY_NAME}@${API_VERSION}"
+            sh "docker push ${DOCKERHUB_REPOSITORY_NAME}@${API_VERSION}"
+            sh "echo 'Image has been pushed to Docker hub registry, Deploying Into Google Cloud Kubernetes Engine'"
+            sh "Removing Local Image, In order to free the space for new potential versions.."
+            sh "docker image rm ${DOCKER_IMAGE_DESIRED_NAME}:${API_VERSION}"
+            }
+        }
 
+        stage("gcp-bulding-manifests-stage") {
+            steps{
+                sh "gcloud build submit --file=${DEPLOYMENT_FILE_LINK}"
+                sh "gcloud build submit --file=${DEPLOYMENT_FILE_LINK} --no-source"
+                sh "echo 'Google Cloud Built the manifests... Deploying into cluster."
+            }
+        }
+
+        stage("gke-deployment") {
+            steps{
+                sh "Deploying New Version Manifest Into Kubernetes Cluster..."
+                step([
+                    $class: "KubernetesEngineBuilder",
+                    clusterName: env.CLUSTER_NAME,
+                    location: env.LOCATION, 
+                    projectId: env.PROJECT_ID,
+                    credentialsId: env.CREDENTIALS_ID,
+                    verifyDeployments: true, 
+                    manifestPattern: env.DEPLOYMENT_MANIFEST_LINK,
+                ])
             }
         }
     }
