@@ -11,7 +11,9 @@ import (
 
 	firebase "firebase.google.com/go"
 	"firebase.google.com/go/db"
+	"github.com/LovePelmeni/OnlineStore/StoreService/external_services/exceptions"
 	"github.com/LovePelmeni/OnlineStore/StoreService/external_services/orders"
+	"github.com/mercari/go-circuitbreaker"
 )
 
 // Collection Properties
@@ -24,7 +26,7 @@ var (
 
 var (
 	FIREBASE_DATABASE_NAME = os.Getenv("FIREBASE_DATABASE_NAME")
-	FirebaseDatabaseUrl    = fmt.Sprintf("https://%s.firebaseio.com")
+	FirebaseDatabaseUrl    = fmt.Sprintf("https://%s.firebaseio.com", FIREBASE_DATABASE_NAME)
 )
 
 var (
@@ -46,9 +48,9 @@ var (
 
 func InitializeFirebaseCredentials() bool {
 
-	StorageBucketID = os.Getenv("STORAGE_BUCKET_ID")
-	ProjectID = os.Getenv("PROJECT_ID")
-	ServiceAccountID = os.Getenv("SERVICE_ACCOUNT_ID")
+	StorageBucketID = os.Getenv("FIREBASE_STORAGE_BUCKET_ID")
+	ProjectID = os.Getenv("FIREBASE_PROJECT_ID")
+	ServiceAccountID = os.Getenv("FIREBASE_SERVICE_ACCOUNT_ID")
 
 	return true
 }
@@ -134,26 +136,59 @@ func NewFirebaseConfig() *FirebaseConfig {
 type FirebaseInitializer struct {
 	// Implementation of the `FirebaseInitializerInterface`.
 
-	Config *FirebaseConfig // Firebase Project Configuration.
+	Config         *FirebaseConfig // Firebase Project Configuration.
+	CircuitBreaker circuitbreaker.CircuitBreaker
 }
 
 // Firebase Application Initializer, Contains Method For Initializing Firebase Abstractions...
 
 func NewFirebaseInitializer(Config FirebaseConfig) *FirebaseInitializer {
 	// Initializes New Instanse of `FirebaseInitializer`
-	return &FirebaseInitializer{Config: &Config}
+	return &FirebaseInitializer{Config: &Config,
+		CircuitBreaker: *circuitbreaker.New(
+			circuitbreaker.WithOpenTimeout(20),
+			circuitbreaker.WithOnStateChangeHookFn(func(oldState, newState circuitbreaker.State) {
+				if newState == "OPEN" {
+					ErrorLogger.Println("Firebase database is not available. Any Operations Not Allowed. Time: " + time.Now().String())
+				}
+				if newState == "CLOSED" {
+					InfoLogger.Println("Firebase database is Available and Ready For New Requests... Time: " + time.Now().String())
+				}
+			}),
+		)}
 }
 
 func (this *FirebaseInitializer) InitializeFirebaseDatabase(Application *firebase.App) (*db.Client, error) {
 	// Method Initializes database collection ..
-	Context, TimeoutError := context.WithTimeout(context.Background(), 10*time.Second)
-	newDatabase, DatabaseError := Application.Database(Context)
+
+	var databaseClientInstance *db.Client
+	_, DatabaseError := this.CircuitBreaker.Do(
+
+		context.Background(),
+		func() (interface{}, error) {
+
+			Context, TimeoutError := context.WithTimeout(context.Background(), 10*time.Second)
+			newDatabase, Error := Application.Database(Context)
+
+			if Error != nil {
+				this.CircuitBreaker.FailWithContext(
+					context.Background())
+				return nil, exceptions.ServiceUnavailable()
+
+			} else {
+				databaseClientInstance = newDatabase
+				this.CircuitBreaker.Done(Context, nil)
+				return nil, nil
+			}
+
+			defer TimeoutError()
+			return nil, nil
+		},
+	)
 	if DatabaseError != nil {
-		ErrorLogger.Println("Failed to Initialize Database...")
 		return nil, DatabaseError
 	}
-	defer TimeoutError()
-	return newDatabase, nil
+	return databaseClientInstance, nil
 }
 
 func (this *FirebaseInitializer) InitializeFirebaseCollection(CollectionName string) (*db.Ref, error) {
@@ -194,15 +229,31 @@ func (this *FirebaseInitializer) InitializeFirebaseApplication() (*firebase.App,
 
 type FirebaseDatabaseOrderManager struct {
 	FirebaseInitializer FirebaseInitializerInterface // Initializer for Getting Access to the Firebase Instances..
+	CircuitBreaker      circuitbreaker.CircuitBreaker
 }
 
 func NewFirebaseDatabaseOrderManager(FirebaseInitializer FirebaseInitializerInterface) *FirebaseDatabaseOrderManager {
 	return &FirebaseDatabaseOrderManager{
 		FirebaseInitializer: FirebaseInitializer,
-	}
+		CircuitBreaker: *circuitbreaker.New(
+			circuitbreaker.WithHalfOpenMaxSuccesses(10),
+			circuitbreaker.WithOpenTimeout(20),
+			circuitbreaker.WithOnStateChangeHookFn(func(oldState, newState circuitbreaker.State) {
+				if newState == "OPEN" {
+					ErrorLogger.Println("Firebase database is not available. Any Operations Not Allowed. Time: " + time.Now().String())
+				}
+				if newState == "CLOSED" {
+					InfoLogger.Println("Firebase database is Available and Ready For New Requests... Time: " + time.Now().String())
+				}
+			}),
+		)}
 }
 
 func (this *FirebaseDatabaseOrderManager) CreateOrder(OrderCredentials *orders.OrderCredentialsInterface) (bool, error) {
+
+	if !this.CircuitBreaker.Ready() {
+		return false, exceptions.ServiceUnavailable()
+	} // Checking for CircuitBreaker State..
 
 	CollectionReference, Exception := this.FirebaseInitializer.InitializeFirebaseCollection(OrdersCollectionName)
 	if Exception != nil {
@@ -211,34 +262,63 @@ func (this *FirebaseDatabaseOrderManager) CreateOrder(OrderCredentials *orders.O
 		return false, errors.New("Failed to Initialize Collection.")
 	}
 
-	DatabaseContext, CancelMethod := context.WithTimeout(context.Background(), time.Second*20)
+	var Saved bool
 
-	TransactionError := CollectionReference.Set(DatabaseContext, OrderCredentials)
-	if TransactionError != nil {
-		ErrorLogger.Println("Failed to Save")
-		return false, errors.New("Failed to Save New Order.")
+	_, Error := this.CircuitBreaker.Do(context.Background(), func() (interface{}, error) {
+
+		DatabaseContext, CancelMethod := context.WithTimeout(context.Background(), time.Second*20)
+		TransactionError := CollectionReference.Set(DatabaseContext, OrderCredentials)
+		if TransactionError != nil {
+			this.CircuitBreaker.FailWithContext(DatabaseContext)
+			ErrorLogger.Println("Failed to Save")
+			return false, exceptions.ServiceUnavailable()
+		} else {
+			Saved = true
+			this.CircuitBreaker.Done(DatabaseContext, nil)
+			return nil, nil
+		}
+		return nil, nil
+	})
+	if Error != nil {
+		return Saved, Error
 	}
-
-	defer CancelMethod()
-	return true, nil
+	return Saved, nil
 }
 
 func (this *FirebaseDatabaseOrderManager) CancelOrder(OrderId string) (bool, error) {
 
-	DatabaseContext, CancelMethod := context.WithTimeout(context.Background(), time.Second*20)
+	if !this.CircuitBreaker.Ready() {
+		return false, exceptions.ServiceUnavailable()
+	} // Checking CircuitBreaker State..
+
 	CollectionReference, Error := this.FirebaseInitializer.InitializeFirebaseCollection(OrdersCollectionName)
 	if Error != nil {
 		ErrorLogger.Println("Failed to Initialize Collection Order Reference.")
 		return false, errors.New("Failed to Initialize Collection.")
 	}
 
-	CanceledError := CollectionReference.Child(
-		OrderId).Delete(DatabaseContext)
+	var Canceled bool
 
-	if CanceledError != nil {
-		ErrorLogger.Println("Failed to Cancel Order with ID: " + OrderId)
-		return false, errors.New("Failed to Cancel Order with ID: " + OrderId)
+	_, TransactionError := this.CircuitBreaker.Do(context.Background(), func() (interface{}, error) {
+
+		DatabaseContext, CancelMethod := context.WithTimeout(context.Background(), time.Second*20)
+		TransactionError := CollectionReference.Child(
+			OrderId).Delete(DatabaseContext)
+
+		if TransactionError != nil {
+			this.CircuitBreaker.FailWithContext(DatabaseContext)
+			return false, exceptions.ServiceUnavailable()
+
+		} else {
+			Canceled = true
+			this.CircuitBreaker.Done(DatabaseContext, nil)
+			return nil, nil
+		}
+		defer CancelMethod()
+		return nil, nil
+	})
+	if TransactionError != nil {
+		return Canceled, TransactionError
 	}
-	defer CancelMethod()
-	return true, nil
+	return Canceled, nil
 }

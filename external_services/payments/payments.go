@@ -35,6 +35,7 @@ func InitializeLoggers() (bool, error) {
 	WarningLogger = log.New(LogFile, "WARNING: ", log.Ldate|log.Ltime|log.Llongfile)
 	return true, nil
 }
+
 func init() {
 	Initialized, Errors := InitializeLoggers()
 	if Errors != nil || !Initialized {
