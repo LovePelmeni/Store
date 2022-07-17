@@ -1,9 +1,19 @@
 // Google Cloud Continious Delivery Pipeline..
+
+def checkKubernetesManifestUpdated (namespace) {
+    // Logic of checking for any cluster updates...
+    sh "kubectl get pods --namespace=" + namespace  // returns all pods related to deployment namespace 
+    sh "kubectl "
+    return true
+}
+
+
 pipeline {
 
     agent any 
-    load "./credentials.groovy"
-
+    load "./deployment.groovy"  // file for storing current Version Deployment Variables...
+    load "./gke_credentials.groovy" // fire responsible for storing GKE Credentials...
+ 
     stages {
 
         stage("build") {
@@ -16,23 +26,32 @@ pipeline {
         stage("test") {
             steps {
                 // Testing Stage Goes There.
+                sh "curl -f http://localhost:8000/healthcheck/" // healthcheck 
+                sh "echo 'Image Currently Running.. Waiting For Confirm one.." 
+                sleep 10
+                sh "curl -f http://localhost:8000/healthcheck/" // another healthcheck after specific period of time, 
+                // if there were some errors occurred, they'are suppose to show up on the text HTTP Request.
+                sh "Application Running without any Errors, going to `Docker-Deployment` Stage...."
             }
         }
 
         stage("docker-deployment") {
             steps{
-            sh "docker tag new_versioned_image ${DOCKERHUB_REPOSITORY_NAME}@${API_VERSION}"
-            sh "docker push ${DOCKERHUB_REPOSITORY_NAME}@${API_VERSION}"
+            sh "Running `Docker-Deployment` Stage."
+            sh "docker tag new_versioned_image ${env.DOCKERHUB_REPOSITORY_NAME}@${env.API_VERSION}"
+            sh "docker push ${env.DOCKERHUB_REPOSITORY_NAME}@${env.API_VERSION}"
             sh "echo 'Image has been pushed to Docker hub registry, Deploying Into Google Cloud Kubernetes Engine'"
             sh "Removing Local Image, In order to free the space for new potential versions.."
-            sh "docker image rm ${DOCKER_IMAGE_DESIRED_NAME}:${API_VERSION}"
+            sh "docker image rm ${env.DOCKER_IMAGE_DESIRED_NAME}:${env.API_VERSION}"
+            sh "`Docker-Deployment` stage passed.. Going to `GCP-Build` Stage..."
             }
         }
 
         stage("gcp-bulding-manifests-stage") {
             steps{
-                sh "gcloud build submit --file=${DEPLOYMENT_FILE_LINK}"
-                sh "gcloud build submit --file=${DEPLOYMENT_FILE_LINK} --no-source"
+                sh "Running `GCP-Build` Stage..."
+                sh "gcloud build submit --file=${env.DEPLOYMENT_FILE_LINK}"
+                sh "gcloud build submit --file=${env.DEPLOYMENT_FILE_LINK} --no-source"
                 sh "echo 'Google Cloud Built the manifests... Deploying into cluster."
             }
         }
@@ -49,6 +68,10 @@ pipeline {
                     verifyDeployments: true, 
                     manifestPattern: env.DEPLOYMENT_MANIFEST_LINK,
                 ])
+                sh "Checking for Updates inside the Cluster..."
+                sleep 10 // waiting some time in order to let cluster apply new changes..
+                if checkKubernetesManifestUpdated() != true {sh "No Any Updates to the Cluster Yet"}
+                sh "New Version were successfully deployed into cluster,"
             }
         }
     }

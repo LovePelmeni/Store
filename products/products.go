@@ -14,6 +14,8 @@ import (
 	"io"
 	"os"
 
+	"strconv"
+
 	"github.com/LovePelmeni/OnlineStore/StoreService/authentication"
 	"github.com/LovePelmeni/OnlineStore/StoreService/models"
 	"github.com/gin-gonic/gin"
@@ -153,7 +155,6 @@ func GetProductsCatalog(context *gin.Context) {
 	var products []models.Product
 	var customer models.Customer
 
-	var CustomerBalance float64
 	var AnnotatedProducts []struct {
 		Product   models.Product
 		Available bool
@@ -177,7 +178,7 @@ func GetProductsCatalog(context *gin.Context) {
 
 	group := sync.WaitGroup{}
 
-	var CustomerPaymentProfileData map[string]string
+	var CustomerPaymentBalance struct{ Balance string }
 
 	go func() {
 		group.Add(1)
@@ -186,7 +187,7 @@ func GetProductsCatalog(context *gin.Context) {
 		requestUrl := fmt.Sprintf("http://%s:%s/get/customer/info/",
 			os.Getenv("PAYMENT_APPLICATION_HOST"), os.Getenv("PAYMENT_APPLICATION_PORT"))
 
-		requestUrl += fmt.Sprintf("?customerId=%s", string(customer.ID))
+		requestUrl += fmt.Sprintf("?customerId=%s", fmt.Sprint(customer.ID))
 		request, Error := http.NewRequest("GET", requestUrl, nil)
 		if Error != nil {
 			ErrorLogger.Println("Failed To Initialize Request.")
@@ -196,8 +197,10 @@ func GetProductsCatalog(context *gin.Context) {
 		Response, Error := client.Do(request)
 
 		SerializedPaymentProfileInfo, Error := io.ReadAll(Response.Body)
-		DecodeError := json.Unmarshal(SerializedPaymentProfileInfo, &CustomerPaymentProfileData)
-		_ = DecodeError
+		DecodeError := json.Unmarshal(SerializedPaymentProfileInfo, &CustomerPaymentBalance)
+		if DecodeError != nil {
+			DebugLogger.Println("Failed to Parse Customer Balance..")
+		}
 
 	}() // Parsing Customer Balance..
 
@@ -206,16 +209,32 @@ func GetProductsCatalog(context *gin.Context) {
 		InfoLogger.Println("Failed to Parse Products Query.")
 		context.JSON(http.StatusNotImplemented, nil)
 	}
+	// If failed to Parse Balance, returns simple query of products...
+	if len(CustomerPaymentBalance.Balance) == 0 {
+		Query, Error := json.Marshal(Products)
+		if Error != nil {
+			context.JSON(
+				http.StatusNotImplemented, gin.H{"Error": Error.Error()})
+		} else {
+			context.JSON(http.StatusOK, gin.H{"products": Query})
+		}
+	} else {
 
-	for _, row := range products {
+		convertedBalance, Error := strconv.ParseFloat(CustomerPaymentBalance.Balance, 5)
+		if Error != nil {
+			DebugLogger.Println("Failed to Parse Customer balance to float.")
 
-		IsAvailable := row.ProductPrice > CustomerBalance
-		AnnotatedProducts = append(AnnotatedProducts, struct {
-			Product   models.Product
-			Available bool
-		}{Product: row, Available: IsAvailable})
+			for _, row := range products {
+
+				IsAvailable := row.ProductPrice > convertedBalance
+				AnnotatedProducts = append(AnnotatedProducts, struct {
+					Product   models.Product
+					Available bool
+				}{Product: row, Available: IsAvailable})
+			}
+			context.JSON(http.StatusOK, gin.H{"products": AnnotatedProducts})
+		}
 	}
-	context.JSON(http.StatusOK, gin.H{"products": AnnotatedProducts})
 }
 
 func GetProduct(context *gin.Context) {

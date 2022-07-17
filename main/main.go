@@ -34,9 +34,28 @@ var (
 	WarnLogger  *log.Logger
 )
 
+func InitializeLoggers() (bool, error) {
+
+	LogFile, Error := os.OpenFile("Main.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
+	DebugLogger = log.New(LogFile, "DEBUG: ", log.Ltime|log.Ldate|log.Llongfile|log.Lmsgprefix)
+	InfoLogger = log.New(LogFile, "INFO: ", log.Ltime|log.Ldate|log.Llongfile|log.Lmsgprefix)
+	ErrorLogger = log.New(LogFile, "ERROR: ", log.Ltime|log.Ldate|log.Llongfile|log.Lmsgprefix)
+	WarnLogger = log.New(LogFile, "WARNING: ", log.Ltime|log.Ldate|log.Llongfile|log.Lmsgprefix)
+
+	if Error != nil {
+		return false, Error
+	}
+	return true, nil
+}
+
 func init() {
 
-	// Initializing API Servers...
+	// Initializing Loggers...
+
+	Initialized, Error := InitializeLoggers()
+	if Error != nil || Initialized == false {
+		panic(Error)
+	}
 
 	// Migrating into Postgresql
 	Failed := models.Database.AutoMigrate(
@@ -48,15 +67,6 @@ func init() {
 	if Failed != nil {
 		panic(fmt.Sprintf("Failed To Auto Migrate, Error: %s", Failed.Error()))
 	}
-	LogFile, error := os.OpenFile("Main.log", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0666)
-	if error != nil {
-		panic("Failed To Create Log file For Main.go File")
-	}
-
-	DebugLogger = log.New(LogFile, "DEBUG: ", log.Ltime|log.Ldate|log.Llongfile|log.Lmsgprefix)
-	InfoLogger = log.New(LogFile, "INFO: ", log.Ltime|log.Ldate|log.Llongfile|log.Lmsgprefix)
-	ErrorLogger = log.New(LogFile, "ERROR: ", log.Ltime|log.Ldate|log.Llongfile|log.Lmsgprefix)
-	WarnLogger = log.New(LogFile, "WARNING: ", log.Ltime|log.Ldate|log.Llongfile|log.Lmsgprefix)
 }
 
 func main() {
@@ -73,7 +83,7 @@ func main() {
 	router.Use(cors.New(cors.Config{
 
 		AllowOrigins:     []string{fmt.Sprintf("http://%s:%s", EMAIL_APPLICATION_HOST, EMAIL_APPLICATION_PORT)},
-		AllowMethods:     []string{"*"},
+		AllowMethods:     []string{"GET", "POST", "DELETE", "PUT", "OPTIONS", "PATCH"},
 		AllowHeaders:     []string{"*"},
 		AllowCredentials: true,
 		AllowFiles:       true,
@@ -123,7 +133,7 @@ func main() {
 		router.GET("/popular/week/products", products.GetTopWeekProducts) // AllowAny
 	}
 
-	DebugLogger.Println("Running HTTP Server.")
+	DebugLogger.Println("Running HTTP Server...")
 	http.ListenAndServe(fmt.Sprintf("%s:%s",
 		APPLICATION_HOST, APPLICATION_PORT), Protection(router))
 }

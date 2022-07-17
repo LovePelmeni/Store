@@ -116,13 +116,24 @@ func (this *grpcEmailClient) getClient() (*grpcControllers.NewEmailClient, error
 
 type GrpcEmailSender struct {
 	Client grpcEmailClientInterface
+	CircuitBreaker circuitbreaker.CircuitBreaker 
 } // Implementation
 
 
 func NewGrpcEmailSender() (*GrpcEmailSender){
-	Client := NewGrpcEmailClient()
+
+	Client := NewGrpcEmailClient() // Initializing Grpc Client 
+	NewCircuitBreaker := circuitbreaker.New( // Initializing new Circuit breaker....
+		circuitbreaker.WithOpenTimeout(20),
+		circuitbreaker.WithFailOnContextCancel(true),
+		circuitbreaker.WithOnStateChangeHookFn(func(old_state, new_state circuitbreaker.State){
+			if new_state == "OPEN" {ErrorLogger.Println("CircuitBreaker is UP, Failure in the Email Service. State: " + new_state)}else{
+				InfoLogger.Println("CircuitBreaker is closed.. Issue Fixed... State: " + new_state)
+			}
+		}),
+	)
 	if Client == nil {panic("Failed To Intialize Grpc Client for Email Service. Seems Like it did not respond.")}
-	return &GrpcEmailSender{Client: Client}
+	return &GrpcEmailSender{Client: Client, CircuitBreaker: *NewCircuitBreaker}
 }
 
 // Method for sending out default Emails without any concrete topic.
@@ -137,13 +148,29 @@ func (this *GrpcEmailSender) SendDefaultEmail(customerEmail string, message stri
 		Message:       message,
 	}
 
-	response, ResponseError := grpcClient.SendEmail(EmailRequestCredentials)
+	RequestContext, CancelError := context.WithTimeout(context.Background(), time.Second * 10)
+	Delivered, ResponseError := this.CircuitBreaker.Do(RequestContext,
+	   
+		
+		func() (interface{}, error){ 
+			Response, Exception := grpcClient.SendEmail(EmailRequestCredentials);
+			if Exception != nil {this.CircuitBreaker.FailWithContext(RequestContext);
+		    return false, Exception} else{
+
+			defer this.CircuitBreaker.Done(RequestContext, nil)	
+			DebugLogger.Println("Notification Has been Sended...")
+			return Response.Delivered, nil 
+			}
+		})
+	
 
 	if ResponseError != nil {
 		return false, exceptions.FailedRequest(
-			ResponseError)
+		ResponseError)
 	}
-	return response.Delivered, nil
+
+	defer CancelError()
+	return Delivered, nil
 }
 
 // Method For sending Order Accepted Emails...
