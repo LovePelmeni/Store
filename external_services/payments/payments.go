@@ -111,6 +111,8 @@ type PaymentRefundControllerInterface interface {
 	CreatePaymentRefund(PaymentRefundCredentials *PaymentRefundCredentialsInterface) (map[string]string, error)
 }
 
+
+
 // Implementations..
 
 // Credentials Implementations...
@@ -130,8 +132,15 @@ func (this *PaymentIntentCredentials) Validate() (*PaymentIntentCredentials, []e
 func (this *PaymentIntentCredentials) GetCredentials()
 
 type PaymentSessionCredentials struct {
+
 	Mutex       sync.RWMutex
-	Credentials struct {
+	Credentials struct {	
+
+		ProductId string 
+		PurchaserId string 
+		PurchaserUsername string 
+		TotalPrice string 
+		Currency string
 	}
 }
 
@@ -144,8 +153,10 @@ func (this *PaymentSessionCredentials) Validate() (PaymentSessionCredentials, []
 func (this *PaymentSessionCredentials) GetCredentials() (*PaymentSessionCredentials, []error)
 
 type PaymentRefundCredentials struct {
+
 	Mutex       sync.RWMutex
 	Credentials struct {
+		PaymentId string 
 	}
 }
 
@@ -169,6 +180,11 @@ func (this *PaymentRefundCredentials) GetCredentials() (*PaymentRefundCredential
 // Controller Implementations
 
 type PaymentIntentController struct {
+	// Represents Interface of the Payment Intent was implemented for communication between this app and `Payment Service`, to allow making Payment Intents...
+	// Requires Attributes:
+		// Client - grpc Client that represents Payment Grpc Service as described in proto file: https://github.com/LovePelemeni/Payment-Service/API/grpc/proto/payment.proto 
+		// CircuitBreaker - For Preventing Failure Operations, while the `Payment Service` is not available...
+
 	Client         paymentClients.PaymentIntentClientInterface
 	CircuitBreaker curcuitbreaker.CircuitBreaker
 }
@@ -182,8 +198,8 @@ func NewPaymentIntentController(Client *paymentClients.PaymentIntentClientInterf
 
 				if newState == "OPEN" {ErrorLogger.Fatal("Payment Service Is Down, And Does Not Respond On Any Requests.")} 
 				if newState == "CLOSED" {InfoLogger.Fatal("Payment Service Is Now Recorved. Time: " + time.Now().String())}
-			}),
-		)}
+		}),
+	)}
 }
 
 
@@ -250,8 +266,6 @@ func (this *PaymentIntentController) CreatePaymentIntent(Credentials *PaymentInt
 
 
 
-
-
 type PaymentSessionController struct {
 
 	// Interface Represents Entity of the Payment Session...
@@ -276,17 +290,44 @@ func NewPaymentSessionController(Client *paymentClients.PaymentSessionClientInte
 	)),
 }
 
-func (this *PaymentSessionController) CreatePaymentSession(Credentials *PaymentSessionCredentials) (map[string]string, []error) {
+func (this *PaymentSessionController) CreatePaymentSession(Credentials *PaymentSessionCredentials) (struct{PaymentSessionId string}, []error) {
 
+	if !this.CircuitBreaker.Ready() {return struct{PaymentSessionId string}{},
+    []error{exceptions.ServiceUnavailable()}} // Checks for Circuit Breaker Status...
+
+	grpcClient := this.Client.GetClient() // obtaining grpc Client for `PaymentSession` Service.
+	credentials, Error := Credentials.Validate()
+	if Error != nil {return struct{PaymentSessionId string}{},
+    []error{exceptions.ValidationError()}}
+
+	var PaymentSession *paymentGrpcControllers.PaymentSessionResponse
+	_, Error := this.CircuitBreaker.Do(
+
+		context.Background(),
+		func() (interface{}, error){
+
+			paymentSessionCredentials := paymentGrpcControllers.PaymentSessionParams{
+				ProductId: Credentials.ProductId, 
+				PurchaserId: Credentials.PurchaserId,
+			}
+
+			context, CancelError := context.WithTimeout(context.Background(), time.Second * 10)
+			grpcResponse, Error := grpcClient.CreatePaymentSession(context, paymentSessionCredentials)
+
+			defer CancelError()
+			switch Error {
+				case nil:
+					this.CircuitBreaker.Done(context)
+					return nil, nil
+
+				default:
+					this.CircuitBreaker.FailWithContext(context)
+					return nil, exceptions.ServiceUnavailable()
+			}
+	})
+	return struct{PaymentSessionId string}{
+	PaymentSessionId: PaymentSession.PaymentSessionId}, []error{}
 }
-
-
-
-
-
-
-
-
 
 
 

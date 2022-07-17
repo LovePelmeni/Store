@@ -110,18 +110,20 @@ func (this *grpcEmailClient) getClient() (grpcControllers.EmailSenderClient, err
 				GRPC_SERVER_HOST, GRPC_SERVER_PORT))
 
 			grpcClient := grpcControllers.NewEmailSenderClient(Connection)
-			if Error != nil {
-				ErrorLogger.Println(
-					"Failed to Connect To Email Grpc Server: Error " + Error.Error())
-				this.CircuitBreaker.FailWithContext(context)
-				return nil, exceptions.ServiceUnavailable()
+			defer CancelError()
+			switch Error {
 
-			} else {
+			case nil:
 				EmailClient = grpcClient
 				this.CircuitBreaker.Done(context, nil)
 				return nil, Error
+
+			default:
+				this.CircuitBreaker.FailWithContext(context)
+				return nil, Error
 			}
 		})
+
 	_ = Client
 	if Error != nil {
 		ErrorLogger.Println("Failed to Initialize Grpc Email Client.")
@@ -173,22 +175,24 @@ func (this *GrpcEmailSender) SendDefaultEmail(customerEmail string, message stri
 	}
 
 	var DeliveredResponse grpcControllers.EmailResponse // Variable that the Response is going to be stored in...
-	RequestContext, CancelError := context.WithTimeout(context.Background(), time.Second*10)
-	Response, ResponseError := this.CircuitBreaker.Do(RequestContext,
+	Response, ResponseError := this.CircuitBreaker.Do(context.Background(),
 
 		func() (interface{}, error) {
 
-			context, CancelError := context.WithTimeout(context.Background(), time.Second*10)
-			Response, Exception := grpcClient.SendEmail(context, &EmailRequestCredentials)
-			if Exception != nil {
-				this.CircuitBreaker.FailWithContext(RequestContext)
-				return false, Exception
-			} else {
+			RequestContext, CancelError := context.WithTimeout(context.Background(), time.Second*10)
+			Response, Exception := grpcClient.SendEmail(RequestContext, &EmailRequestCredentials)
 
+			defer CancelError()
+			switch Exception {
+
+			case nil:
 				defer this.CircuitBreaker.Done(RequestContext, nil)
 				DebugLogger.Println("Notification Has been Sended...")
-				defer CancelError()
 				return Response.Delivered, nil
+
+			default:
+				this.CircuitBreaker.FailWithContext(RequestContext)
+				return false, Exception
 			}
 		})
 
@@ -198,7 +202,6 @@ func (this *GrpcEmailSender) SendDefaultEmail(customerEmail string, message stri
 		return false, exceptions.ServiceUnavailable()
 	}
 
-	defer CancelError()
 	return DeliveredResponse.Delivered, nil
 }
 
@@ -229,13 +232,16 @@ func (this *GrpcEmailSender) SendAcceptEmail(customerEmail string, message strin
 
 			RequestContext, CancelError := context.WithTimeout(context.Background(), time.Second*10)
 			Response, Error := grpcClient.SendOrderEmail(context.Background(), &RequestParams)
-			if Error != nil {
-				DeliveredResponse = Response
-				return false, exceptions.ServiceUnavailable()
-			} else {
+
+			defer CancelError()
+			switch Error {
+			case nil:
 				this.CircuitBreaker.Done(RequestContext, nil)
 				DeliveredResponse = Response
 				return true, nil
+			default:
+				DeliveredResponse = Response
+				return false, exceptions.ServiceUnavailable()
 			}
 		})
 
@@ -276,11 +282,14 @@ func (this *GrpcEmailSender) SendRejectEmail(customerEmail string, message strin
 			context, CancelError := context.WithTimeout(context.Background(), time.Second*10)
 			Response, Error := grpcClient.SendOrderEmail(context, &RequestParams)
 
-			if Error != nil {
-				return nil, exceptions.ServiceUnavailable()
-			} else {
+			defer CancelError()
+			switch Error {
+			case nil:
 				DeliveredResponse = Response
 				return nil, nil
+
+			default:
+				return nil, exceptions.ServiceUnavailable()
 			}
 		})
 	_ = Response

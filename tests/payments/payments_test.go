@@ -41,7 +41,7 @@ func (this *PaymentIntentSuite) TestPaymentIntentCreate() {
 	TestPaymentIntentId := "test-payment-intent-id"
 	ExpectedgRPCResponse := grpcControllers.PaymentIntentResponse{PaymentIntentId: TestPaymentIntentId}
 	ExpectedResponse := map[string]string{"PaymentIntentId": TestPaymentIntentId}
-	RequestParams := payments.PaymentIntentCredentials{}
+	RequestParams := &payments.PaymentIntentCredentials{}
 
 	this.MockedPaymentIntentCredentials.EXPECT().GetCredentials().Return(RequestParams, nil).Times(1)
 	this.MockedPaymentIntentClient.EXPECT().CreatePaymentIntent().Return(ExpectedgRPCResponse, nil).Times(1)
@@ -55,7 +55,7 @@ func (this *PaymentIntentSuite) TestPaymentIntentFailCreate() {
 
 	ExpectedgRPCResponse := grpcControllers.PaymentIntentResponse{PaymentIntentId: "-"}
 	ExpectedResponseError := errors.New("Payment Intent Failure")
-	RequestedParams := payments.PaymentIntentCredentials{}
+	RequestedParams := &payments.PaymentIntentCredentials{}
 
 	this.MockedPaymentIntentCredentials.EXPECT().GetCredentials().Return(RequestedParams, nil).Times(1)
 	this.MockedPaymentIntentClient.EXPECT().Return(ExpectedgRPCResponse, nil).Times(1)
@@ -95,7 +95,8 @@ func (this *PaymentSessionSuite) TestPaymentSessionCreate() {
 	this.MockedPaymentSessionClient.EXPECT().CreatePaymentSession(
 		grpcControllers.PaymentSessionParams{
 			ProductId:   PaymentSessionCredentials.ProductId,
-			PurchaserId: PaymentSessionCredentials.PurchaserId}).Return(true, nil).Times(1)
+			PurchaserId: PaymentSessionCredentials.PurchaserId,
+		}).Return(true, nil).Times(1)
 
 	Response, Error := this.PaymentSessionController.CreatePaymentSession(
 		this.MockedPaymentSessionCredentials)
@@ -127,7 +128,7 @@ func (this *PaymentRefundSuite) TeardownTest() {
 	this.Controller.Finish()
 }
 func (this *PaymentRefundSuite) TestCreatePaymentRefund() {
-	RefundCredentials := payments.PaymentRefundCredentials{}
+	RefundCredentials := &payments.PaymentRefundCredentials{}
 	RefundResponse := struct{ RefundId string }{RefundId: "1"}
 
 	this.MockedRefundCredentials.EXPECT().Validate().Return(
@@ -135,11 +136,23 @@ func (this *PaymentRefundSuite) TestCreatePaymentRefund() {
 	this.MockedRefundClient.CreatePaymentRefund(
 		gomock.Eq(RefundCredentials)).Return(RefundResponse, nil).Times(1)
 
-	Response, Error := this.PaymentRefundController.CreatePaymentRefund(RefundCredentials)
-	assert.Equal(Response, RefundResponse, "Refund Response should be an Struct.")
-	assert.NoError(Error, "Error Should Equals To Nil, Because of Positive Response.")
+	Response, Error := this.PaymentRefundController.CreateRefundIntent(RefundCredentials)
+	assert.Equal(this.T(), Response, RefundResponse, "Refund Response should be an Struct.")
+	assert.NoError(this.T(), Error[0], "Error Should Equals To Nil, Because of Positive Response.")
 }
 
 func (this *PaymentRefundSuite) TestCreateFailCreatePaymentRefund() {
 
+	RefundCredentials := &payments.PaymentRefundCredentials{}
+	ValidationException := []error{errors.New("Validation Error.")}
+
+	this.MockedRefundCredentials.EXPECT().Validate().Return(
+		nil, ValidationException).Times(1)
+
+	this.MockedRefundClient.CreatePaymentRefund(
+		gomock.Eq(RefundCredentials)).Return(nil, nil).Times(1)
+
+	Response, Error := this.PaymentRefundController.CreateRefundIntent(RefundCredentials)
+	assert.Equal(this.T(), Response, nil, "Refund Response should be an Struct.")
+	assert.NoError(this.T(), Error[0], "Error Should Equals To Nil, Because of Positive Response.")
 }
