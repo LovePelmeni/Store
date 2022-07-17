@@ -17,7 +17,6 @@ import (
 
 	"github.com/LovePelmeni/OnlineStore/StoreService/external_services/orders/firebase"
 	"github.com/LovePelmeni/OnlineStore/StoreService/models"
-	"github.com/go-redis/redis"
 	circuitbreaker "github.com/mercari/go-circuitbreaker"
 )
 
@@ -70,10 +69,10 @@ type OrderCredentialsInterface interface {
 }
 
 type OrderSessionInterface interface {
-	// Interface that represents Order Session, 
+	// Interface that represents Order Session,
 	GetSession() (map[string]string, error) // Returns Json Structure, Possible errors: NotFound, Timeout
-	SetParams() (bool, error) // Returns bool if params has been updated successfully.
-} 
+	SetParams() (bool, error)               // Returns bool if params has been updated successfully.
+}
 
 //go:generate -destination=StoreService/mocks/orders.go . OrderControllerInterface
 type OrderControllerInterface interface {
@@ -303,49 +302,9 @@ func (this *OrderCredentials) GetCredentials() (*OrderCredentials, []error) {
 	return OrderCredentials, nil
 }
 
-
-type OrderSession struct {
-	SessionId string 
-	Timeout *time.Time
-	RedisClient *redis.CloudRedisClient 
-	SessionCredentials *OrderCredentialsInterface // data that is stored in the order Session..
-}
-
-func NewOrderSession() *OrderSession {
-	Client, Error := GetRedisClient()
-	if Error != nil {return nil}
-	return &OrderSession{RedisClient: Client}
-}
-
-func (this *OrderSession) generateSessionId() (string, error) {}
-
-func (this *OrderSession) Initialize() {
-	SessionJsonStruct := struct{}{} // struct that represents Session...
-	GeneratedSessionId := this.generateSessionId()
-	SetupSession, Error := this.Client.Set(fmt.Sprintf(
-	"Session-%s", GeneratedSessionId))
-	if SetupSession != false && Error == nil {this.SessionId = GeneratedSessionId}
-
-}
-func (this *OrderSession) SetParams(Params map[string]string) (bool, error) {
-
-	var session this 
-	Session, SessionError := this.RedisClient.Get("Session-" + this.generateSessionId)
-	if errors.Is(SessionError, redis.TxFailedErr) {return false, SessionError}
-
-	SessionStructedFields := reflect.TypeOf(&Session)
-	for Property, Value := range Params {
-		SessionStructedFields.FieldByName(Property) = Value
-	}
-	Set, Error := this.RedisClient.Set(Session, this.Timeout)
-	if Error != nil {return false, Error}
-	return true, nil
-}
-
-
 type OrderController struct {
 	FirebaseManager firebase.FirebaseDatabaseOrderManagerInterface // for managing orders...
-	CircuitBreaker  *circuitbreaker.CircuitBreaker 
+	CircuitBreaker  *circuitbreaker.CircuitBreaker
 }
 
 func NewOrderController(FirebaseOrderManager *firebase.FirebaseDatabaseOrderManager) *OrderController {
@@ -353,24 +312,27 @@ func NewOrderController(FirebaseOrderManager *firebase.FirebaseDatabaseOrderMana
 	return &OrderController{
 		FirebaseManager: FirebaseOrderManager,
 
-		CurcuitBreaker: circuitbreaker.New(
+		CircuitBreaker: circuitbreaker.New(
 
 			circuitbreaker.WithOpenTimeout(20),
 			circuitbreaker.WithHalfOpenMaxSuccesses(10),
-			circuitbreaker.WithOnStateChangeHookFn(func(old_state, new_state circuitbreaker.State){
+			circuitbreaker.WithOnStateChangeHookFn(func(old_state, new_state circuitbreaker.State) {
 				if hasPrefix := strings.HasPrefix(strings.ToLower(
-				string(new_state)), "cl"); hasPrefix == true {} else{ // check if state has been changed to close..
+					string(new_state)), "cl"); hasPrefix == true {
+				} else { // check if state has been changed to close..
 
-				ErrorLogger.Println(fmt.Sprintf(
-				"CircuitBreaker Is Opened. New State: %s", new_state))}
+					ErrorLogger.Println(fmt.Sprintf(
+						"CircuitBreaker Is Opened. New State: %s", new_state))
+				}
 			}),
-	)}
+		)}
 }
 
 func (this *OrderController) CreateOrder(OrderCredentials OrderCredentialsInterface) (bool, []error) {
 
-
-	if this.CircuitBreaker.Ready() != true {return false, []error{errors.New("Service Is Unavailable")}}
+	if this.CircuitBreaker.Ready() != true {
+		return false, []error{errors.New("Service Is Unavailable")}
+	}
 	OrderCredentials, Errors := OrderCredentials.GetCredentials() // Validating Credentials First..
 	if len(Errors) != 0 {
 		return false, Errors
@@ -379,35 +341,41 @@ func (this *OrderController) CreateOrder(OrderCredentials OrderCredentialsInterf
 	BreakerContext, TimeoutError := context.WithTimeout(context.Background(), time.Second*10)
 	defer TimeoutError()
 
-
-	if Created, Error := this.CurcuitBreaker.Do(BreakerContext, func() (interface{}, error) {
+	_, Error := this.CircuitBreaker.Do(BreakerContext, func() (interface{}, error) {
 		Response, Error := this.FirebaseManager.CreateOrder(OrderCredentials)
 
 		if Response != true || Error != nil {
 			this.CircuitBreaker.FailWithContext(BreakerContext)
 			return false, Error
 		}
-		this.CircuitBreaker.Done(BreakerContext)
+		this.CircuitBreaker.Done(BreakerContext, nil)
 		return true, nil
 
-	}); Created != true || Error != nil {
-		return false, []error{Error}
-	}
-	return true, nil
+	})
+	return false, []error{Error}
 }
 
 func (this *OrderController) CancelOrder(OrderId string) (bool, error) {
 
 	// Checking if circuit breaker works properly..
-	if this.CircuitBreaker.Ready() != true {return false, errors.New("Service is Unavailable.")}
+	if this.CircuitBreaker.Ready() != true {
+		return false, errors.New("Service is Unavailable.")
+	}
+	var Canceled bool
+	_, Error := this.CircuitBreaker.Do(
 
-	context := context.WithTimeout(context.Background(), time.Second * 10)
-	if Response, Error := this.CircuitBreaker.Do(context, func() (interface{}, error) { 
-		if Deleted, Error := this.FirebaseManager.CancelOrder(OrderId); Deleted != true || Error != nil {
-		ErrorLogger.Println("Failed to Cancel Order.. Reason: " + Error.Error())
-		return false, Error
-	} else {
-		this.CircuitBreaker.Done(context)
-		return true, nil
-	}}); 
+		context.Background(),
+		func() (interface{}, error) {
+
+			if Deleted, Error := this.FirebaseManager.CancelOrder(OrderId); Deleted != true || Error != nil {
+				Canceled = false
+				ErrorLogger.Println("Failed to Cancel Order.. Reason: " + Error.Error())
+				return false, Error
+			} else {
+				Canceled = true
+				this.CircuitBreaker.Done(context.Background(), nil)
+				return true, nil
+			}
+		})
+	return Canceled, Error
 }

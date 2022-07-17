@@ -5,6 +5,8 @@ import (
 
 	"testing"
 
+	"reflect"
+
 	"github.com/LovePelmeni/OnlineStore/StoreService/external_services/payments"
 	grpcControllers "github.com/LovePelmeni/OnlineStore/StoreService/external_services/payments/proto"
 	mock_intent "github.com/LovePelmeni/OnlineStore/StoreService/mocks/intent"
@@ -155,4 +157,46 @@ func (this *PaymentRefundSuite) TestCreateFailCreatePaymentRefund() {
 	Response, Error := this.PaymentRefundController.CreateRefundIntent(RefundCredentials)
 	assert.Equal(this.T(), Response, nil, "Refund Response should be an Struct.")
 	assert.NoError(this.T(), Error[0], "Error Should Equals To Nil, Because of Positive Response.")
+}
+
+type PaymentCheckoutSuite struct {
+	suite.Suite
+	Controller                  *gomock.Controller
+	MockedPaymentCheckoutClient *mock_checkout.MockPaymentCheckoutClientInterface
+	CheckoutController          *payments.PaymentCheckoutController
+}
+
+func TestPaymentCheckoutSuite(t *testing.T) {
+	suite.Run(t, new(PaymentCheckoutSuite))
+}
+
+func (this *PaymentCheckoutSuite) SetupTest() {
+	this.Controller = gomock.NewController(this.T())
+	this.MockedPaymentCheckoutClient = mock_checkout.NewMockPaymentCheckoutClientInterface
+	this.CheckoutController = payments.NewPaymentCheckoutController(this.MockedPaymentCheckoutClient)
+}
+
+func (this *PaymentCheckoutSuite) TeardownTest() {
+	this.Controller.Finish()
+}
+
+func (this *PaymentCheckoutSuite) TestObtainPaymentCheckout() {
+	checkoutId := "test-checkout-id"
+	CheckoutStruct := payments.NewPaymentCheckoutStruct() // basically response of the Checkout Endpoint...
+	this.MockedPaymentCheckoutClient.EXPECT().GetCheckout(gomock.Eq(checkoutId)).Return(CheckoutStruct, nil).Times(1)
+
+	Response, Error := this.MockedPaymentCheckoutClient.GetPaymentCheckout(checkoutId)
+	assert.Equal(this.T(), Response, CheckoutStruct, "Response need to be a struct. Not "+reflect.TypeOf(Response).Kind().String())
+	assert.Equal(this.T(), Error, nil, "Should be no Error Returned, because of success Response.")
+}
+
+func (this *PaymentCheckoutSuite) TestObtainFailPaymentCheckout() {
+	checkoutId := "test-invalid-checkout-id"
+	ResponseException := errors.New("Checkout Failure")
+	this.MockedPaymentCheckoutClient.EXPECT().GetCheckout(gomock.Eq(checkoutId)).Return(
+		nil, ResponseException).Times(1)
+
+	Response, Error := this.CheckoutController.GetCheckout(checkoutId)
+	assert.Equal(this.T(), Response, nil, "Response should be equals to Nil, because of failure.")
+	assert.Equal(this.T(), ResponseException, "Response Exception should be Error not "+reflect.TypeOf(Response).Kind().String())
 }

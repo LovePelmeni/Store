@@ -73,6 +73,14 @@ type PaymentSessionCredentialsInterface interface {
 	GetCredentials() (*PaymentSessionCredentialsInterface, []error)
 }
 
+//go:generate -destination=StoreService/mocks/payments.go --build_flags=--mod=mod . PaymentCheckoutStructInterface
+type PaymentCheckoutStructRendererInterface interface {
+	// Payment Checkout Interface, that is responsible for Processing Checkout Content, 
+	GetImage(CheckoutContent map[string]string) ([]byte, error)
+	GetJson(CheckoutContent map[string]string) ([]byte, error)
+	GetXml(CheckoutContent map[string]string) ([]byte, error)
+}
+
 //go:generate -destination=StoreService/mocks/payments.go --build_flags=--mod=mod . PaymentRefundCredentialsInterface
 
 type PaymentRefundCredentialsInterface interface {
@@ -111,6 +119,10 @@ type PaymentRefundControllerInterface interface {
 	CreatePaymentRefund(PaymentRefundCredentials *PaymentRefundCredentialsInterface) (map[string]string, error)
 }
 
+type PaymentCheckoutControllerInterface interface {
+	// Payment Checkout Interface, that is responsible for obtaining Payment Checkout Info About the Products, that has been purchased...
+	GetPaymentCheckout() (*PaymentCheckoutStructInterface, error)
+}
 
 
 // Implementations..
