@@ -1,16 +1,19 @@
 package emails
 
 import (
-	"os"
+	"context"
+	"errors"
 	"log"
-	"github.com/LovePelmeni/OnlineStore/EmailService/emails/proto/grpcControllers"
+	"os"
+	"strings"
+	"time"
+
+	"fmt"
+
+	"github.com/LovePelmeni/EmailService/emails/proto/grpcControllers"
 	"github.com/LovePelmeni/OnlineStore/StoreService/external_services/exceptions"
 	"github.com/mercari/go-circuitbreaker"
 	"google.golang.org/grpc"
-	"context"
-	"errors"
-	"time"
-	"strings"
 )
 
 var (
@@ -31,22 +34,21 @@ func InitializeLoggers() (bool, error) {
 	DebugLogger = log.New(LogFile, "DEBUG: ", log.Ldate|log.Llongfile|log.Ltime)
 	InfoLogger = log.New(LogFile, "INFO: ", log.Ldate|log.Llongfile|log.Ltime)
 	ErrorLogger = log.New(LogFile, "ERROR: ", log.Ldate|log.Ltime|log.Lshortfile)
-	return true, Error 
+	return true, Error
 }
 
 func init() {
 
 	Initialized, Error := InitializeLoggers()
-	if Initialized != true || Error != nil {panic("Failed to Initialize Loggers in Emails.go ")}
+	if Initialized != true || Error != nil {
+		panic("Failed to Initialize Loggers in Emails.go ")
+	}
 }
-
 
 type grpcEmailSenderInterface interface {
 	// grpc Email Sender Interface.
 	// Is Used For Comminucating with `Email Service` API
 	// using gRPC. Provides Following API Methods for handling emails behaviour.
-
-	getClient() (*grpcControllers.NewEmailClient, error)
 
 	SendDefaultEmail(
 		customerEmail string,
@@ -66,73 +68,89 @@ type grpcEmailSenderInterface interface {
 
 type grpcEmailClientInterface interface {
 	// Email Interface represents Email grpc Client...
-	getClient() (*grpcControllers.NewEmailClient, error)
+	getClient() (grpcControllers.EmailSenderClient, error)
 }
 
+// Implementation....
 
 type grpcEmailClient struct {
 	CircuitBreaker *circuitbreaker.CircuitBreaker
 }
 
-func NewGrpcEmailClient() (*grpcEmailClient) {
+func NewGrpcEmailClient() *grpcEmailClient {
 	return &grpcEmailClient{CircuitBreaker: circuitbreaker.New(
 
-		circuitbreaker.WithOpenTimeout(20), 
+		circuitbreaker.WithOpenTimeout(20),
 		circuitbreaker.WithOnStateChangeHookFn(
 
-		func(old_state, new_state circuitbreaker.State){
-			if hasPrefix := strings.HasPrefix(
-			strings.ToLower(string(new_state)), "cl"); hasPrefix == true {
-				DebugLogger.Println(
-					"Failed to Connect to Grpc Server of `Email` Service.",
-				)
-			}
-		}),
+			func(old_state, new_state circuitbreaker.State) {
+				if hasPrefix := strings.HasPrefix(
+					strings.ToLower(string(new_state)), "cl"); hasPrefix == true {
+					DebugLogger.Println(
+						"Failed to Connect to Grpc Server of `Email` Service.",
+					)
+				}
+			}),
 	)}
 }
 
+func (this *grpcEmailClient) getClient() (grpcControllers.EmailSenderClient, error) {
 
+	var EmailClient grpcControllers.EmailSenderClient
+	if this.CircuitBreaker.Ready() != true {
+		return nil, errors.New("Email Service Is Unavailable.")
+	} // Checks for Circuit Breaker Availability..
+	context, CancelError := context.WithTimeout(context.Background(), time.Second*10)
 
-func (this *grpcEmailClient) getClient() (*grpcControllers.NewEmailClient, error) {
+	Client, Error := this.CircuitBreaker.Do(context,
 
-	if this.CircuitBreaker.Ready() != true {return nil, errors.New("Email Service Is Unavailable.")}
-	context, CancelError := context.WithTimeout(context.Background(), time.Second * 10)
-	defer CancelError()
+		func() (interface{}, error) {
 
-	return this.CircuitBreaker.Do(context, func() (interface{}, error){
+			Connection, Error := grpc.Dial(fmt.Sprintf("%s:%s",
+				GRPC_SERVER_HOST, GRPC_SERVER_PORT))
 
-	Connection, Error := grpc.Dial("%s:%s",
-		GRPC_SERVER_HOST, GRPC_SERVER_PORT)
-	grpcClient := grpcControllers.NewEmailClient(Connection)
-	if Error != nil {ErrorLogger.Println(
-	"Failed to Connect To Email Grpc Server: Error " + Error.Error());
+			grpcClient := grpcControllers.NewEmailSenderClient(Connection)
+			if Error != nil {
+				ErrorLogger.Println(
+					"Failed to Connect To Email Grpc Server: Error " + Error.Error())
+				this.CircuitBreaker.FailWithContext(context)
+				return nil, exceptions.ServiceUnavailable()
 
-    this.CircuitBreaker.FailWithContext(context)}else{
-	this.CircuitBreaker.Done(context, nil)}
-	return grpcClient, Error
-	})
+			} else {
+				EmailClient = grpcClient
+				this.CircuitBreaker.Done(context, nil)
+				return nil, Error
+			}
+		})
+	_ = Client
+	if Error != nil {
+		ErrorLogger.Println("Failed to Initialize Grpc Email Client.")
+	}
+	return EmailClient, nil
 }
 
-
 type GrpcEmailSender struct {
-	Client grpcEmailClientInterface
-	CircuitBreaker circuitbreaker.CircuitBreaker 
+	Client         grpcEmailClientInterface
+	CircuitBreaker circuitbreaker.CircuitBreaker
 } // Implementation
 
+func NewGrpcEmailSender() *GrpcEmailSender {
 
-func NewGrpcEmailSender() (*GrpcEmailSender){
-
-	Client := NewGrpcEmailClient() // Initializing Grpc Client 
+	Client := NewGrpcEmailClient()           // Initializing Grpc Client
 	NewCircuitBreaker := circuitbreaker.New( // Initializing new Circuit breaker....
 		circuitbreaker.WithOpenTimeout(20),
 		circuitbreaker.WithFailOnContextCancel(true),
-		circuitbreaker.WithOnStateChangeHookFn(func(old_state, new_state circuitbreaker.State){
-			if new_state == "OPEN" {ErrorLogger.Println("CircuitBreaker is UP, Failure in the Email Service. State: " + new_state)}else{
+		circuitbreaker.WithOnStateChangeHookFn(func(old_state, new_state circuitbreaker.State) {
+			if new_state == "OPEN" {
+				ErrorLogger.Println("CircuitBreaker is UP, Failure in the Email Service. State: " + new_state)
+			} else {
 				InfoLogger.Println("CircuitBreaker is closed.. Issue Fixed... State: " + new_state)
 			}
 		}),
 	)
-	if Client == nil {panic("Failed To Intialize Grpc Client for Email Service. Seems Like it did not respond.")}
+	if Client == nil {
+		panic("Failed To Intialize Grpc Client for Email Service. Seems Like it did not respond.")
+	}
 	return &GrpcEmailSender{Client: Client, CircuitBreaker: *NewCircuitBreaker}
 }
 
@@ -140,71 +158,134 @@ func NewGrpcEmailSender() (*GrpcEmailSender){
 
 func (this *GrpcEmailSender) SendDefaultEmail(customerEmail string, message string) (bool, error) {
 
-	grpcClient, Error := this.Client.getClient()
-	if Error != nil {return false, errors.New("Connection GRPC Server Error.")}
+	if !this.CircuitBreaker.Ready() {
+		return false, exceptions.ServiceUnavailable()
+	} // Checking for Circuit Breaker Availability..
 
-	EmailRequestCredentials := grpcControllers.EmailDefaultParams{
-		CustomerEmail: customerEmail,
-		Message:       message,
+	grpcClient, Error := this.Client.getClient()
+	if Error != nil {
+		return false, errors.New("Connection GRPC Server Error.")
 	}
 
-	RequestContext, CancelError := context.WithTimeout(context.Background(), time.Second * 10)
-	Delivered, ResponseError := this.CircuitBreaker.Do(RequestContext,
-	   
-		
-		func() (interface{}, error){ 
-			Response, Exception := grpcClient.SendEmail(EmailRequestCredentials);
-			if Exception != nil {this.CircuitBreaker.FailWithContext(RequestContext);
-		    return false, Exception} else{
+	EmailRequestCredentials := grpcControllers.DefaultEmailParams{
+		CustomerEmail: customerEmail,
+		EmailMessage:  message,
+	}
 
-			defer this.CircuitBreaker.Done(RequestContext, nil)	
-			DebugLogger.Println("Notification Has been Sended...")
-			return Response.Delivered, nil 
+	var DeliveredResponse grpcControllers.EmailResponse // Variable that the Response is going to be stored in...
+	RequestContext, CancelError := context.WithTimeout(context.Background(), time.Second*10)
+	Response, ResponseError := this.CircuitBreaker.Do(RequestContext,
+
+		func() (interface{}, error) {
+
+			context, CancelError := context.WithTimeout(context.Background(), time.Second*10)
+			Response, Exception := grpcClient.SendEmail(context, &EmailRequestCredentials)
+			if Exception != nil {
+				this.CircuitBreaker.FailWithContext(RequestContext)
+				return false, Exception
+			} else {
+
+				defer this.CircuitBreaker.Done(RequestContext, nil)
+				DebugLogger.Println("Notification Has been Sended...")
+				defer CancelError()
+				return Response.Delivered, nil
 			}
 		})
-	
+
+	_ = Response
 
 	if ResponseError != nil {
-		return false, exceptions.FailedRequest(
-		ResponseError)
+		return false, exceptions.ServiceUnavailable()
 	}
 
 	defer CancelError()
-	return Delivered, nil
+	return DeliveredResponse.Delivered, nil
 }
 
 // Method For sending Order Accepted Emails...
 
 func (this *GrpcEmailSender) SendAcceptEmail(customerEmail string, message string) (bool, error) {
 
-	grpcClient, Error := this.Client.getClient()
-	if Error != nil {return false, errors.New("Connection GRPC Server Error.")}
+	if !this.CircuitBreaker.Ready() {
+		return false, exceptions.ServiceUnavailable()
+	} // Checking If Circuit Breaker Is Available...
 
-	RequestParams := grpcControllers.EmailOrderParams{
-		Status:        grpcControllers.STATUS_ACCEPTED,
-		message:       message,
+	grpcClient, Error := this.Client.getClient()
+	if Error != nil {
+		return false, errors.New("Connection GRPC Server Error.")
+	}
+
+	var DeliveredResponse *grpcControllers.EmailResponse
+	RequestParams := grpcControllers.OrderEmailParams{
+		Status:        grpcControllers.OrderStatus_ACCEPTED,
+		Message:       message,
 		CustomerEmail: customerEmail,
 	}
-	response, gRPCError := grpcClient.SendOrderEmail(RequestParams)
+
+	Response, gRPCError := this.CircuitBreaker.Do(
+
+		context.Background(),
+		func() (interface{}, error) {
+
+			RequestContext, CancelError := context.WithTimeout(context.Background(), time.Second*10)
+			Response, Error := grpcClient.SendOrderEmail(context.Background(), &RequestParams)
+			if Error != nil {
+				DeliveredResponse = Response
+				return false, exceptions.ServiceUnavailable()
+			} else {
+				this.CircuitBreaker.Done(RequestContext, nil)
+				DeliveredResponse = Response
+				return true, nil
+			}
+		})
+
+	_ = Response
+
 	if gRPCError != nil {
 		DebugLogger.Println("Failed to send Request")
-		return false, exceptions.FailedRequest(gRPCError)
+		return false, gRPCError
 	}
-	return response.Delivered, nil
+	return DeliveredResponse.Delivered, nil
 }
 
 // Method for sending Order Rejected Emails...
 
 func (this *GrpcEmailSender) SendRejectEmail(customerEmail string, message string) (bool, error) {
 
-	grpcClient, Error := this.Client.getClient()
-	if Error != nil {return false, errors.New("Connection GRPC Server Error.")}
+	if !this.CircuitBreaker.Ready() {
+		return false, exceptions.ServiceUnavailable()
+	} // Checks for Circuit Breaker Availability.
 
-	RequestParams := grpcControllers.EmailOrderStatus{
-		Status:        grpcControllers.STATUS_REJECTED,
-		message:       message,
+	var DeliveredResponse *grpcControllers.EmailResponse
+	grpcClient, Error := this.Client.getClient()
+
+	if Error != nil {
+		return false, errors.New("Connection GRPC Server Error.")
+	}
+
+	RequestParams := grpcControllers.OrderEmailParams{
+		Status:        grpcControllers.OrderStatus_REJECTED,
+		Message:       message,
 		CustomerEmail: customerEmail,
 	}
-	response, ResponseError := grpcClient.SendOrderEmail(RequestParams)
-	return response.Delivered, ResponseError
+
+	Response, ResponseError := this.CircuitBreaker.Do(
+
+		context.Background(),
+		func() (interface{}, error) {
+			context, CancelError := context.WithTimeout(context.Background(), time.Second*10)
+			Response, Error := grpcClient.SendOrderEmail(context, &RequestParams)
+
+			if Error != nil {
+				return nil, exceptions.ServiceUnavailable()
+			} else {
+				DeliveredResponse = Response
+				return nil, nil
+			}
+		})
+	_ = Response
+	if ResponseError != nil {
+		return false, ResponseError
+	}
+	return DeliveredResponse.Delivered, ResponseError
 }

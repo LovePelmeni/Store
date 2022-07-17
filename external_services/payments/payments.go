@@ -65,7 +65,7 @@ type PaymentSessionCredentialsInterface interface {
 	//		- TotalPrice string
 	// 		- Currency string
 	// 		-
-	Validate() (*PaymentSessionCredentialsInterface, []error)
+	Validate() (PaymentSessionCredentialsInterface, []error)
 	GetCredentials() (*PaymentSessionCredentialsInterface, []error)
 }
 
@@ -74,7 +74,7 @@ type PaymentSessionCredentialsInterface interface {
 type PaymentRefundCredentialsInterface interface {
 	// Controller Interface, represents Payment Refund Model, Requires Following Params.
 	// - Payment Id of ORM Model Object the Object That Was Created, during Successful Payment.
-	Validate() (*PaymentRefundCredentialsInterface, []error)
+	Validate() (PaymentRefundCredentialsInterface, []error)
 	GetCredentials() (*PaymentRefundCredentialsInterface, []error)
 }
 
@@ -135,7 +135,7 @@ func NewPaymentSessionCredentials(Credentials struct{}) *PaymentSessionCredentia
 	return &PaymentSessionCredentials{Credentials: Credentials}
 }
 
-func (this *PaymentSessionCredentials) Validate() (*PaymentSessionCredentials, []error)
+func (this *PaymentSessionCredentials) Validate() (PaymentSessionCredentials, []error)
 
 func (this *PaymentSessionCredentials) GetCredentials() (*PaymentSessionCredentials, []error)
 
@@ -149,7 +149,7 @@ func NewPaymentRefundCredentials(Credentials struct{}) *PaymentRefundCredentials
 	return &PaymentRefundCredentials{Credentials: Credentials}
 }
 
-func (this *PaymentRefundCredentials) Validate() (*PaymentRefundCredentials, []error)
+func (this *PaymentRefundCredentials) Validate() (PaymentRefundCredentials, []error)
 
 func (this *PaymentRefundCredentials) GetCredentials() (*PaymentRefundCredentials, []error)
 
@@ -167,6 +167,7 @@ func NewPaymentIntentController(Client *paymentClients.PaymentIntentClientInterf
 
 func (this *PaymentIntentController) CreatePaymentIntent(Credentials *PaymentIntentCredentials) (map[string]string, []error) {
 
+	PaymentGrpcClient, Error := this.Client.GetClient()
 	paymentCredentials, ValidationErrors := Credentials.Validate()
 	if len(ValidationErrors) != 0 {
 		return nil, ValidationErrors
@@ -174,7 +175,7 @@ func (this *PaymentIntentController) CreatePaymentIntent(Credentials *PaymentInt
 	RequestContext, CancelError := context.WithTimeout(context.Background(), time.Second*10) // Initializing Request Context..
 
 	PaymentResponseIntentId, Error := this.CurcuitBreaker.Do(RequestContext, func() (interface{}, error) {
-		PaymentResponse, Error := this.Client.CreatePaymentIntent(
+		PaymentResponse, Error := PaymentGrpcClient.CreatePaymentIntent(
 			RequestContext, paymentCredentials)
 		if Error != nil {
 			InfoLogger.Println(
