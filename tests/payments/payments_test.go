@@ -3,8 +3,12 @@ package test_payments
 import (
 	"errors"
 
+	"testing"
+
 	"github.com/LovePelmeni/OnlineStore/StoreService/external_services/payments"
 	grpcControllers "github.com/LovePelmeni/OnlineStore/StoreService/external_services/payments/proto"
+	mock_intent "github.com/LovePelmeni/OnlineStore/StoreService/mocks/intent"
+	mock_session "github.com/LovePelmeni/OnlineStore/StoreServices/mocks/session"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
@@ -16,6 +20,10 @@ type PaymentIntentSuite struct {
 	MockedPaymentIntentClient      *mock_intent.MockPaymentIntentClientInterface
 	MockedPaymentIntentCredentials *mock_intent.MockPaymentIntentCredentialsInterface
 	PaymentIntentController        *payments.PaymentIntentController
+}
+
+func TestPaymentIntentSuite(t *testing.T) {
+	suite.Run(t, new(PaymentIntentSuite))
 }
 
 func (this *PaymentIntentSuite) SetupTest() {
@@ -65,6 +73,10 @@ type PaymentSessionSuite struct {
 	PaymentSessionController        *payments.PaymentSessionController
 }
 
+func TestPaymentSessionSuite(t *testing.T) {
+	suite.Run(t, new(PaymentSessionSuite))
+}
+
 func (this *PaymentSessionSuite) SetupTest() {
 
 	MockedGrpcServerConnection := mock_grpc.NewMockGrpcServerConnection()
@@ -75,10 +87,9 @@ func (this *PaymentSessionSuite) SetupTest() {
 }
 
 func (this *PaymentSessionSuite) TestPaymentSessionCreate() {
-	PaymentSessionCredentials := payments.PaymentSessionCredentials{
-		ProductId:   "test-product-id",
-		PurchaserId: "test-purchaser-id",
-	}
+
+	PaymentSessionCredentials := payments.NewPaymentSessionCredentials(
+		struct{}{})
 
 	this.MockedPaymentSessionCredentials.EXPECT().GetCredentials().Return(PaymentSessionCredentials, nil).Times(1)
 	this.MockedPaymentSessionClient.EXPECT().CreatePaymentSession(
@@ -88,11 +99,47 @@ func (this *PaymentSessionSuite) TestPaymentSessionCreate() {
 
 	Response, Error := this.PaymentSessionController.CreatePaymentSession(
 		this.MockedPaymentSessionCredentials)
+
 	assert.Equal(this.T(), Response, true, "Response should be equals to true.")
 	assert.Equal(this.T(), Error, nil, "Error Should be equals to None, Because of Success Payment Session Response.")
 }
 
 type PaymentRefundSuite struct {
 	suite.Suite
-	Controller *gomock.Controller
+	Controller              *gomock.Controller
+	MockedRefundCredentials *mock_refund.MockPaymentRefundCredentialsInterface
+	MockedRefundClient      *mock_refund.MockPaymentRefundClientInterface
+	PaymentRefundController *payments.PaymentRefundController
+}
+
+func TestPaymentRefundSuite(t *testing.T) {
+	suite.Run(t, new(PaymentRefundSuite))
+}
+
+func (this *PaymentRefundSuite) SetupTest() {
+	this.Controller = gomock.NewController(this.T())
+	this.MockedRefundCredentials = mock_refund.NewMockPaymentRefundCredentialsInterface(this.Controller)
+	this.MockedRefundClient = mock_refund.NewMockPaymentRefundClientInterface(this.Controller)
+	this.PaymentRefundController = payments.NewPaymentRefundController(this.MockedrefundCredentials, this.MockedRefundClient)
+}
+
+func (this *PaymentRefundSuite) TeardownTest() {
+	this.Controller.Finish()
+}
+func (this *PaymentRefundSuite) TestCreatePaymentRefund() {
+	RefundCredentials := payments.PaymentRefundCredentials{}
+	RefundResponse := struct{ RefundId string }{RefundId: "1"}
+
+	this.MockedRefundCredentials.EXPECT().Validate().Return(
+		RefundCredentials, nil).Times(1)
+	this.MockedRefundClient.CreatePaymentRefund(
+		gomock.Eq(RefundCredentials)).Return(RefundResponse, nil).Times(1)
+
+	Response, Error := this.PaymentRefundController.CreatePaymentRefund(RefundCredentials)
+	assert.Equal(Response, RefundResponse, "Refund Response should be an Struct.")
+	assert.NoError(Error, "Error Should Equals To Nil, Because of Positive Response.")
+}
+
+func (this *PaymentRefundSuite) TestCreateFailCreatePaymentRefund() {
+
 }

@@ -6,7 +6,11 @@ import (
 	"fmt"
 	"os"
 
+	"context"
+
+	"github.com/LovePelmeni/OnlineStore/StoreService/external_services/exceptions"
 	grpcControllers "github.com/LovePelmeni/OnlineStore/StoreService/external_services/payments/proto"
+	"github.com/mercari/go-circuitbreaker"
 	"google.golang.org/grpc"
 )
 
@@ -69,48 +73,88 @@ type PaymentRefundClientInterface interface {
 // Implementations
 
 type GrpcServerConnection struct {
-	ServerHost string
-	ServerPort string
+	ServerHost     string
+	ServerPort     string
+	CircuitBreaker circuitbreaker.CircuitBreaker
 }
 
 func NewGrpcServerConnection(grpcServerHost string, grpcServerPort string) *GrpcServerConnection {
 	return &GrpcServerConnection{ServerHost: grpcServerHost, ServerPort: grpcServerPort}
 }
+
 func (this *GrpcServerConnection) GetConnection() (*grpc.ClientConn, error) {
-	Connection, Error := grpc.Dial(
-		fmt.Sprintf("%s:%s", this.ServerHost, this.ServerPort))
-	if Connection == nil || Error != nil {
-		panic("Failed to Connect To Payment Grpc Server.")
+
+	var ConnectionObj *grpc.ClientConn
+	Response, Error := this.CircuitBreaker.Do(
+
+		context.Background(),
+		func() (interface{}, error) {
+
+			Connection, Error := grpc.Dial(
+				fmt.Sprintf("%s:%s", this.ServerHost, this.ServerPort))
+			if Connection == nil || Error != nil {
+				this.CircuitBreaker.FailWithContext(nil)
+				return nil, exceptions.ServiceUnavailable()
+			} else {
+				ConnectionObj = Connection
+				return nil, nil
+			}
+		})
+
+	_ = Response
+
+	if Error != nil {
+		return nil, Error
 	}
-	return Connection, nil
+	return ConnectionObj, nil
 }
+
+// Clients Goes There....
 
 type PaymentIntentClient struct {
-	Connection *GrpcServerConnectionInterface
+	Connection GrpcServerConnectionInterface
 }
 
-func NewPaymentIntentClient(Connection *GrpcServerConnectionInterface) *PaymentIntentClient {
+func NewPaymentIntentClient(Connection GrpcServerConnectionInterface) *PaymentIntentClient {
 	return &PaymentIntentClient{Connection: Connection}
 }
 
-func (this *PaymentIntentClient) GetClient() (grpcControllers.PaymentIntentClient, error)
-
-type PaymentSessionClient struct {
-	Connection *GrpcServerConnectionInterface
+func (this *PaymentIntentClient) GetClient() (grpcControllers.PaymentIntentClient, error) {
+	Connection, Error := this.Connection.GetConnection()
+	if Error != nil {
+		return nil, exceptions.ServiceUnavailable()
+	}
+	return grpcControllers.NewPaymentIntentClient(Connection), nil
 }
 
-func NewPaymentSessionClient(Connection *GrpcServerConnectionInterface) *PaymentSessionClient {
+type PaymentSessionClient struct {
+	Connection GrpcServerConnectionInterface
+}
+
+func NewPaymentSessionClient(Connection GrpcServerConnectionInterface) *PaymentSessionClient {
 	return &PaymentSessionClient{Connection: Connection}
 }
 
-func (this *PaymentSessionClient) GetClient() (grpcControllers.PaymentSessionClient, error)
-
-type PaymentRefundClient struct {
-	Connection *GrpcServerConnectionInterface
+func (this *PaymentSessionClient) GetClient() (grpcControllers.PaymentSessionClient, error) {
+	Connection, Error := this.Connection.GetConnection()
+	if Error != nil {
+		return nil, Error
+	}
+	return grpcControllers.NewPaymentSessionClient(Connection), nil
 }
 
-func NewPaymentRefundClient(Connection *GrpcServerConnectionInterface) *PaymentRefundClient {
+type PaymentRefundClient struct {
+	Connection GrpcServerConnectionInterface
+}
+
+func NewPaymentRefundClient(Connection GrpcServerConnectionInterface) *PaymentRefundClient {
 	return &PaymentRefundClient{Connection: Connection}
 }
 
-func (this *PaymentRefundClient) GetClient() grpcControllers.RefundClient
+func (this *PaymentRefundClient) GetClient() grpcControllers.RefundClient {
+	ServerConnection, Error := this.Connection.GetConnection()
+	if Error != nil {
+		return nil
+	}
+	return grpcControllers.NewRefundClient(ServerConnection)
+}

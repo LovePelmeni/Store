@@ -64,6 +64,6 @@ func (this *EmailIntegrationSuite) TestFailSendEmail() {
 	assert.Equal(this.T(), error, Exception, "Error Should Be Not None.")
 }
 
-func TestEmailInterfaceSuite(t *testing.T) {
+func TestEmailIntegrationSuite(t *testing.T) {
 	suite.Run(t, new(EmailIntegrationSuite))
 }
