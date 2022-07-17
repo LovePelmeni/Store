@@ -8,7 +8,7 @@ pipeline {
 
             steps{
                 sh "echo 'Running Build Pipeline...'"
-                sh "echo 'docker build . --name=new_store_application_image'"
+                sh "echo 'docker build . --name=new_versioned_image'"
                 sleep 10 
                 echo "Docker Built Image Successfully! And Initial Tests Has been Passed. 
                 Going to the Testing Stage.."
@@ -33,10 +33,9 @@ pipeline {
                 sh "Deploying New API Version: ${env.VERSION}"
                 sh "echo 'Running Deployment Pipeline Stage...'"
                 sh "echo 'Tagging new Image Version'"
-                sh "echo 'docker tag new_store_application_image 
-                crazycoderrr/store_service@${env.VERSION}'"
+                sh "echo 'docker tag new_store_application_image ${env.DOCKERHUB_REPOSITORY_NAME}@${env.VERSION}'"
                 sh "echo 'Tagged Successfully.. Pushing Image On Docker Hub..'"
-                sh "echo 'docker push crazycoderrr/store_service@${env.VERSION}'"
+                sh "echo 'docker tag new_versioned_image ${env.DOCKERHUB_REPOSITORY_NAME}@${env.VERSION}"
                 sh "echo 'Image has been Pushed Successfully! Pipeline Finished.'"
             }
         }

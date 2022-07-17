@@ -27,38 +27,38 @@ pipeline {
             steps {
                 // Testing Stage Goes There.
                 sh "curl -f http://localhost:8000/healthcheck/" // healthcheck 
-                sh "echo 'Image Currently Running.. Waiting For Confirm one.." 
+                sh "echo 'Image Currently Running.. Waiting For Confirm one..'" 
                 sleep 10
                 sh "curl -f http://localhost:8000/healthcheck/" // another healthcheck after specific period of time, 
                 // if there were some errors occurred, they'are suppose to show up on the text HTTP Request.
-                sh "Application Running without any Errors, going to `Docker-Deployment` Stage...."
+                sh "echo 'Application Running without any Errors, going to `Docker-Deployment` Stage....'"
             }
         }
 
         stage("docker-deployment") {
             steps{
-            sh "Running `Docker-Deployment` Stage."
-            sh "docker tag new_versioned_image ${env.DOCKERHUB_REPOSITORY_NAME}@${env.API_VERSION}"
-            sh "docker push ${env.DOCKERHUB_REPOSITORY_NAME}@${env.API_VERSION}"
+            sh "echo 'Running `Docker-Deployment` Stage.'"
+            sh "echo 'docker tag new_versioned_image ${env.DOCKERHUB_REPOSITORY_NAME}@${env.API_VERSION}'"
+            sh "echo 'docker push ${env.DOCKERHUB_REPOSITORY_NAME}@${env.API_VERSION}'"
             sh "echo 'Image has been pushed to Docker hub registry, Deploying Into Google Cloud Kubernetes Engine'"
-            sh "Removing Local Image, In order to free the space for new potential versions.."
-            sh "docker image rm ${env.DOCKER_IMAGE_DESIRED_NAME}:${env.API_VERSION}"
-            sh "`Docker-Deployment` stage passed.. Going to `GCP-Build` Stage..."
+            sh "echo 'Removing Local Image, In order to free the space for new potential versions..'"
+            sh "echo 'docker image rm ${env.DOCKER_IMAGE_DESIRED_NAME}:${env.API_VERSION}'"
+            sh "echo '`Docker-Deployment` stage passed.. Going to `GCP-Build` Stage...'"
             }
         }
 
         stage("gcp-bulding-manifests-stage") {
             steps{
-                sh "Running `GCP-Build` Stage..."
-                sh "gcloud build submit --file=${env.DEPLOYMENT_FILE_LINK}"
-                sh "gcloud build submit --file=${env.DEPLOYMENT_FILE_LINK} --no-source"
+                sh "echo 'Running `GCP-Build` Stage...'"
+                sh "echo 'gcloud build submit --file=${env.DEPLOYMENT_FILE_LINK}'"
+                sh "echo 'gcloud build submit --file=${env.DEPLOYMENT_FILE_LINK} --no-source'"
                 sh "echo 'Google Cloud Built the manifests... Deploying into cluster."
             }
         }
 
         stage("gke-deployment") {
             steps{
-                sh "Deploying New Version Manifest Into Kubernetes Cluster..."
+                sh "echo 'Deploying New Version Manifest Into Kubernetes Cluster...'"
                 step([
                     $class: "KubernetesEngineBuilder",
                     clusterName: env.CLUSTER_NAME,
@@ -68,10 +68,10 @@ pipeline {
                     verifyDeployments: true, 
                     manifestPattern: env.DEPLOYMENT_MANIFEST_LINK,
                 ])
-                sh "Checking for Updates inside the Cluster..."
+                sh "echo 'Checking for Updates inside the Cluster...'"
                 sleep 10 // waiting some time in order to let cluster apply new changes..
-                if checkKubernetesManifestUpdated() != true {sh "No Any Updates to the Cluster Yet"}
-                sh "New Version were successfully deployed into cluster,"
+                if checkKubernetesManifestUpdated() != true {sh "echo 'No Any Updates to the Cluster Yet'"}else{
+                sh "echo 'New Version were successfully deployed into cluster'"}
             }
         }
     }

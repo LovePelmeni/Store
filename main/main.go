@@ -9,8 +9,10 @@ import (
 
 	"github.com/LovePelmeni/OnlineStore/StoreService/customers"
 	"github.com/LovePelmeni/OnlineStore/StoreService/middlewares"
+
 	"github.com/LovePelmeni/OnlineStore/StoreService/models"
 	"github.com/LovePelmeni/OnlineStore/StoreService/products"
+
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/csrf"
@@ -91,7 +93,7 @@ func main() {
 
 	// CSRF Goes there.
 
-	Protection := csrf.Protect([]byte("some-authentication-key"))
+	Protection := csrf.Protect([]byte(os.Getenv("CSRF_TOKEN_SECRET_KEY")))
 
 	// HEALTHCHECK
 
