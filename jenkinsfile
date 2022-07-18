@@ -17,6 +17,8 @@ pipeline {
         stage("test"){
             steps{
                 // checking for application health..
+                load "./version_env.groovy"
+
                 sh "echo 'Running Test Pipeline'"
                 sh "echo 'Running Healtcheck Test...'"
                 sh "echo 'curl -f http://${env.APPLICATION_HOST}:${APPLICATION_PORT}'"
@@ -29,6 +31,7 @@ pipeline {
 
             steps{  
                 load "./version_env.groovy"
+                
                 sh "echo 'Running Deployment Pipeline Stage...'"
                 sh "echo 'Tagging new Image Version'"
                 sh "echo 'docker tag new_store_application_image ${env.DOCKERHUB_REPOSITORY_NAME}:latest'"
