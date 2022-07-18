@@ -1,7 +1,7 @@
 // Pipeline that Builds / Tests / Deploys the new Version of the Image.
 pipeline {
 
-    agent { dockerfile { filename "Dockerfile" dir "."}} 
+    agent { docker {image "docker:rc"} } 
     stages {
 
         stage("build"){
