@@ -1,15 +1,10 @@
 // Pipeline that Builds / Tests / Deploys the new Version of the Image.
 pipeline {
 
-    agent any 
+    agent {dockerfile true}
     stages {
 
         stage("build"){
-
-            agent {
-                dockerfile true
-            }
-
             steps{
                 sh "echo 'Running Build Pipeline...'"
                 sh "docker build . --name=new_versioned_image"
@@ -41,10 +36,6 @@ pipeline {
         }
 
         stage("deployment"){
-
-            agent {
-                dockerfile true 
-            }
 
             steps {  
                 load "./version_env.groovy"
