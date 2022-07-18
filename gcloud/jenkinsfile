@@ -1,16 +1,19 @@
 // Google Cloud Continious Delivery Pipeline..
 
-def checkKubernetesManifestUpdated (namespace) {
+def checkKubernetesManifestUpdated (containerName, namespace) {
     // Logic of checking for any cluster updates...
-    sh "kubectl get pods --namespace=" + namespace  // returns all pods related to deployment namespace 
-    sh "kubectl "
-    return true
+    final def (String kubernetesCtlResponse) = 
+    sh (script: "kubectl get pods --namespace=$namespace --container=$containerName",
+    returnStdout: true).trim()  // returns all pods related to deployment namespace 
+    if (kubernetesCtlResponse == "No resource has been found.") {sh "Still"; return false}else{
+        return true 
+    }
 }
 
 
 pipeline {
 
-    agent any 
+    agent { dockerfile true }
     load "./deployment.groovy"  // file for storing current Version Deployment Variables...
     load "./gke_credentials.groovy" // fire responsible for storing GKE Credentials...
  
@@ -23,15 +26,27 @@ pipeline {
             }
         }
 
-        stage("test") {
-            steps {
-                // Testing Stage Goes There.
-                sh "curl -f http://localhost:8000/healthcheck/" // healthcheck 
-                sh "echo 'Image Currently Running.. Waiting For Confirm one..'" 
-                sleep 10
-                sh "curl -f http://localhost:8000/healthcheck/" // another healthcheck after specific period of time, 
-                // if there were some errors occurred, they'are suppose to show up on the text HTTP Request.
-                sh "echo 'Application Running without any Errors, going to `Docker-Deployment` Stage....'"
+        stage("test"){
+            steps{
+                // checking for application health..
+                load "./version_env.groovy"
+
+                sh "echo 'Running Test Pipeline'"
+                sh "echo 'Running Healtcheck Test...'"
+
+                sh "Sleeping until the Application will be fully ready..."
+                sleep 10    
+
+                script {
+                    final String url = "http://${env.APPLICATION_HOST}:${APPLICATION_PORT}"
+                    final def (String response, int code) =
+                    sh(script: "curl -X GET -f $url", returnStdout: true).trim().tokenize("\n")
+        
+                    if (code == 200) {sh "echo Application health State Is Okay... Running Deployment Stage.."}else{
+                        echo "Application Responded with Failure, Not Ready for Production..."
+                        error "Health Check Stage Failure."
+                    }
+                }
             }
         }
 

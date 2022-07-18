@@ -1,7 +1,7 @@
 // Pipeline that Builds / Tests / Deploys the new Version of the Image.
 pipeline {
 
-    agent {dockerfile true}
+    agent { dockerfile true }
     stages {
 
         stage("build"){
@@ -22,15 +22,17 @@ pipeline {
                 sh "echo 'Running Healtcheck Test...'"
 
                 sh "Sleeping until the Application will be fully ready..."
-                sleep 10
-        
-                final String url = "http://${env.APPLICATION_HOST}:${APPLICATION_PORT}"
-                final def (String response, int code) =
-                sh(script: "curl -X GET -f $url", returnStdout: true).trim().tokenize("\n")
-    
-                if (code == 200) {sh "echo Application health State Is Okay... Running Deployment Stage.."}else{
-                    echo "Application Responded with Failure, Not Ready for Production..."
-                    error "Health Check Stage Failure."
+                sleep 10    
+
+                script {
+                    final String url = "http://${env.APPLICATION_HOST}:${APPLICATION_PORT}"
+                    final def (String response, int code) =
+                    sh(script: "curl -X GET -f $url", returnStdout: true).trim().tokenize("\n")
+            
+                    if (code == 200) {sh "echo Application health State Is Okay... Running Deployment Stage.."}else{
+                        echo "Application Responded with Failure, Not Ready for Production..."
+                        error "Health Check Stage Failure."
+                    }
                 }
             }
         }
