@@ -1,7 +1,15 @@
 // Pipeline that Builds / Tests / Deploys the new Version of the Image.
 pipeline {
 
-    agent { dockerfile true }
+    agent { dockerfile {
+        filename "Dockerfile"
+        dir "."
+    }} 
+    environment {
+        PATH="/opt/homebrew/Cellar/docker-machine/0.16.2/bin/docker-machine/bin:${env.PATH}"
+       // added docker path to the pipeline in order to Jenkins will recognize it... 
+       // Useful for local development server but will require Installation, when it will be running on the Kubernetes...
+    }
     stages {
 
         stage("build"){
