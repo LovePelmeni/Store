@@ -6,14 +6,18 @@ pipeline {
 
         stage("build"){
 
+            agent {
+                dockerfile true
+            }
+
             steps{
                 sh "echo 'Running Build Pipeline...'"
-                sh "echo 'docker build . --name=new_versioned_image'"
+                sh "docker build . --name=new_versioned_image"
                 sleep 10 
                 sh "echo 'Docker Built Image Successfully! And Initial Tests Has been Passed. Going to the Testing Stage..'"
             }
         }
-        
+
         stage("test"){
             steps{
                 // checking for application health..
@@ -21,22 +25,35 @@ pipeline {
 
                 sh "echo 'Running Test Pipeline'"
                 sh "echo 'Running Healtcheck Test...'"
-                sh "echo 'curl -f http://${env.APPLICATION_HOST}:${APPLICATION_PORT}'"
-                sh "echo 'Application Health State Is Okay... Running Other Tests...'"
-                sh "echo 'All Tests Passed... Running Deployment Pipeline...'"
+
+                sh "Sleeping until the Application will be fully ready..."
+                sleep 10
+        
+                final String url = "http://${env.APPLICATION_HOST}:${APPLICATION_PORT}"
+                final def (String response, int code) =
+                sh(script: "curl -X GET -f $url", returnStdout: true).trim().tokenize("\n")
+    
+                if (code == 200) {sh "echo Application health State Is Okay... Running Deployment Stage.."}else{
+                    echo "Application Responded with Failure, Not Ready for Production..."
+                    error "Health Check Stage Failure."
+                }
             }
         }
 
         stage("deployment"){
 
-            steps{  
+            agent {
+                dockerfile true 
+            }
+
+            steps {  
                 load "./version_env.groovy"
                 
                 sh "echo 'Running Deployment Pipeline Stage...'"
                 sh "echo 'Tagging new Image Version'"
-                sh "echo 'docker tag new_store_application_image ${env.DOCKERHUB_REPOSITORY_NAME}:latest'"
+                sh "docker tag new_store_application_image ${env.DOCKERHUB_REPOSITORY_NAME}:latest"
                 sh "echo 'Tagged Successfully.. Pushing Image On Docker Hub..'"
-                sh "echo 'docker tag new_versioned_image ${env.DOCKERHUB_REPOSITORY_NAME}:latest"
+                sh "docker tag new_versioned_image ${env.DOCKERHUB_REPOSITORY_NAME}:latest"
                 sh "echo 'Image has been Pushed Successfully! Pipeline Finished.'"
             }
         }
