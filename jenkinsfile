@@ -68,6 +68,7 @@ pipeline {
                 }
             }
         }
+        
         post {
             always {
                 sh "Logging Out From Dockerhub..."
