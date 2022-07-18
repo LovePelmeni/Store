@@ -10,8 +10,7 @@ pipeline {
                 sh "echo 'Running Build Pipeline...'"
                 sh "echo 'docker build . --name=new_versioned_image'"
                 sleep 10 
-                echo "Docker Built Image Successfully! And Initial Tests Has been Passed. 
-                Going to the Testing Stage.."
+                sh "echo 'Docker Built Image Successfully! And Initial Tests Has been Passed. Going to the Testing Stage..'"
             }
         }
         
