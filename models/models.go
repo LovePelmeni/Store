@@ -125,7 +125,7 @@ func (this *ProductModelValidator) GetPatterns() map[string]string {
 
 type Product struct {
 	gorm.Model
-	Id                 int     `gorm:"BIGSERIAL NOT NULL PRIMARY KEY UNIQUE"`
+	Id                 int     `gorm:"BIGSERIAL NOT NULL PRIMARY KEY UNIQUE" json:"Id"`
 	OwnerEmail         string  `gorm:"VARCHAR(100) NOT NULL UNIQUE" json:"OwnerEmail"`
 	ProductName        string  `gorm:"VARCHAR(100) NOT NULL UNIQUE" json:"ProductName"`
 	ProductDescription string  `gorm:"VARCHAR(100) NOT NULL DEFAULT 'This Product Has No Description'" json:"ProductDescription"`

@@ -12,7 +12,8 @@ import (
 	firebase "firebase.google.com/go"
 	"firebase.google.com/go/db"
 	"github.com/LovePelmeni/OnlineStore/StoreService/external_services/exceptions"
-	"github.com/LovePelmeni/OnlineStore/StoreService/external_services/orders"
+
+	// "github.com/LovePelmeni/OnlineStore/StoreService/external_services/orders"
 	"github.com/mercari/go-circuitbreaker"
 )
 
@@ -108,7 +109,7 @@ type FirebaseInitializerInterface interface {
 
 type FirebaseDatabaseOrderManagerInterface interface {
 	// Interface for Managing `Order` Collection in Firebase Real Time Database
-	CreateOrder(OrderCredentials *orders.OrderCredentialsInterface) (bool, error)
+	CreateOrder(OrderCredentials struct{}) (bool, error)
 	CancelOrder(OrderId string) (bool, error)
 }
 
@@ -161,6 +162,10 @@ func NewFirebaseInitializer(Config FirebaseConfig) *FirebaseInitializer {
 func (this *FirebaseInitializer) InitializeFirebaseDatabase(Application *firebase.App) (*db.Client, error) {
 	// Method Initializes database collection ..
 
+	if !this.CircuitBreaker.Ready() {
+		return nil, exceptions.ServiceUnavailable()
+	}
+
 	var databaseClientInstance *db.Client
 	_, DatabaseError := this.CircuitBreaker.Do(
 
@@ -170,19 +175,17 @@ func (this *FirebaseInitializer) InitializeFirebaseDatabase(Application *firebas
 			Context, TimeoutError := context.WithTimeout(context.Background(), 10*time.Second)
 			newDatabase, Error := Application.Database(Context)
 
-			if Error != nil {
-				this.CircuitBreaker.FailWithContext(
-					context.Background())
-				return nil, exceptions.ServiceUnavailable()
+			defer TimeoutError()
+			switch Error {
 
-			} else {
+			case nil:
 				databaseClientInstance = newDatabase
 				this.CircuitBreaker.Done(Context, nil)
-				return nil, nil
+				return true, Error
+			default:
+				this.CircuitBreaker.FailWithContext(Context)
+				return false, exceptions.ServiceUnavailable()
 			}
-
-			defer TimeoutError()
-			return nil, nil
 		},
 	)
 	if DatabaseError != nil {
@@ -249,7 +252,7 @@ func NewFirebaseDatabaseOrderManager(FirebaseInitializer FirebaseInitializerInte
 		)}
 }
 
-func (this *FirebaseDatabaseOrderManager) CreateOrder(OrderCredentials *orders.OrderCredentialsInterface) (bool, error) {
+func (this *FirebaseDatabaseOrderManager) CreateOrder(OrderCredentials struct{}) (bool, error) {
 
 	if !this.CircuitBreaker.Ready() {
 		return false, exceptions.ServiceUnavailable()
@@ -262,27 +265,29 @@ func (this *FirebaseDatabaseOrderManager) CreateOrder(OrderCredentials *orders.O
 		return false, errors.New("Failed to Initialize Collection.")
 	}
 
-	var Saved bool
+	var Created bool
 
 	_, Error := this.CircuitBreaker.Do(context.Background(), func() (interface{}, error) {
 
-		DatabaseContext, CancelMethod := context.WithTimeout(context.Background(), time.Second*20)
+		DatabaseContext, CancelMethod := context.WithTimeout(context.Background(), time.Second*10)
 		TransactionError := CollectionReference.Set(DatabaseContext, OrderCredentials)
-		if TransactionError != nil {
-			this.CircuitBreaker.FailWithContext(DatabaseContext)
-			ErrorLogger.Println("Failed to Save")
-			return false, exceptions.ServiceUnavailable()
-		} else {
-			Saved = true
-			this.CircuitBreaker.Done(DatabaseContext, nil)
+
+		defer CancelMethod()
+		switch TransactionError {
+		case nil:
+			this.CircuitBreaker.Done(DatabaseContext, context.Canceled)
+			Created = true
 			return nil, nil
+		default:
+			this.CircuitBreaker.FailWithContext(DatabaseContext)
+			Created = false
+			return nil, exceptions.ServiceUnavailable()
 		}
-		return nil, nil
 	})
 	if Error != nil {
-		return Saved, Error
+		return false, exceptions.ServiceUnavailable()
 	}
-	return Saved, nil
+	return Created, Error
 }
 
 func (this *FirebaseDatabaseOrderManager) CancelOrder(OrderId string) (bool, error) {
@@ -305,20 +310,16 @@ func (this *FirebaseDatabaseOrderManager) CancelOrder(OrderId string) (bool, err
 		TransactionError := CollectionReference.Child(
 			OrderId).Delete(DatabaseContext)
 
-		if TransactionError != nil {
-			this.CircuitBreaker.FailWithContext(DatabaseContext)
-			return false, exceptions.ServiceUnavailable()
+		defer CancelMethod()
+		switch TransactionError {
 
-		} else {
-			Canceled = true
+		case nil:
 			this.CircuitBreaker.Done(DatabaseContext, nil)
 			return nil, nil
+		default:
+			this.CircuitBreaker.FailWithContext(DatabaseContext)
+			return nil, exceptions.ServiceUnavailable()
 		}
-		defer CancelMethod()
-		return nil, nil
 	})
-	if TransactionError != nil {
-		return Canceled, TransactionError
-	}
-	return Canceled, nil
+	return Canceled, TransactionError
 }

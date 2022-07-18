@@ -15,3 +15,7 @@ func FailedRequest(reason ...error) error {
 func ServiceUnavailable() error {
 	return errors.New("Service Unavailable...")
 }
+
+func ValidationError() error {
+	return errors.New("Validation Error.")
+}

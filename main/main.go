@@ -130,7 +130,7 @@ func main() {
 	}
 
 	// Most ... Products.
-	router.Group("get/most/").Use(middlewares.SetAuthHeaderMiddleware())
+	router.Group("get/most").Use(middlewares.SetAuthHeaderMiddleware())
 	{
 		router.GET("/popular/week/products", products.GetTopWeekProducts) // AllowAny
 	}

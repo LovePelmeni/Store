@@ -20,7 +20,7 @@ pipeline {
                 // checking for application health..
                 sh "echo 'Running Test Pipeline'"
                 sh "echo 'Running Healtcheck Test...'"
-                sh "echo 'curl -f http://${env.APPLICATION_HOST}:${env.APPLICATION_PORT}'"
+                sh "echo 'curl -f http://${env.APPLICATION_HOST}:${APPLICATION_PORT}'"
                 sh "echo 'Application Health State Is Okay... Running Other Tests...'"
                 sh "echo 'All Tests Passed... Running Deployment Pipeline...'"
             }
@@ -30,12 +30,11 @@ pipeline {
 
             steps{  
                 load "./version_env.groovy"
-                sh "Deploying New API Version: ${env.VERSION}"
                 sh "echo 'Running Deployment Pipeline Stage...'"
                 sh "echo 'Tagging new Image Version'"
-                sh "echo 'docker tag new_store_application_image ${env.DOCKERHUB_REPOSITORY_NAME}@${env.VERSION}'"
+                sh "echo 'docker tag new_store_application_image ${env.DOCKERHUB_REPOSITORY_NAME}:latest'"
                 sh "echo 'Tagged Successfully.. Pushing Image On Docker Hub..'"
-                sh "echo 'docker tag new_versioned_image ${env.DOCKERHUB_REPOSITORY_NAME}@${env.VERSION}"
+                sh "echo 'docker tag new_versioned_image ${env.DOCKERHUB_REPOSITORY_NAME}:latest"
                 sh "echo 'Image has been Pushed Successfully! Pipeline Finished.'"
             }
         }

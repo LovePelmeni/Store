@@ -13,9 +13,9 @@ import (
 	"regexp"
 
 	"context"
-	"time"
 
-	"github.com/LovePelmeni/OnlineStore/StoreService/external_services/orders/firebase"
+	"github.com/LovePelmeni/OnlineStore/StoreService/external_services/exceptions"
+	"github.com/LovePelmeni/OnlineStore/StoreService/external_services/firebase"
 	"github.com/LovePelmeni/OnlineStore/StoreService/models"
 	circuitbreaker "github.com/mercari/go-circuitbreaker"
 )
@@ -338,19 +338,49 @@ func (this *OrderController) CreateOrder(OrderCredentials OrderCredentialsInterf
 		return false, Errors
 	}
 
-	BreakerContext, TimeoutError := context.WithTimeout(context.Background(), time.Second*10)
-	defer TimeoutError()
+	var Created bool
 
-	_, Error := this.CircuitBreaker.Do(BreakerContext, func() (interface{}, error) {
-		Response, Error := this.FirebaseManager.CreateOrder(OrderCredentials)
+	// This is copy of the OrderCredentials Data.
+	orderFirebaseDataStruct := struct {
+		mutex            sync.RWMutex
+		OrderName        string
+		OrderDescription string
 
-		if Response != true || Error != nil {
-			this.CircuitBreaker.FailWithContext(BreakerContext)
-			return false, Error
+		Credentials struct {
+			PurchasersInfo struct {
+				Purchaser *models.Customer
+			}
+
+			ProductsInfo struct {
+				Products         []*models.Product
+				TotalPrice       string
+				Currency         string
+				ProductsQuantity string
+			}
 		}
-		this.CircuitBreaker.Done(BreakerContext, nil)
-		return true, nil
+	}{
+		OrderName:        this.Credentials.OrderName,
+		OrderDescription: this.Credentials.OrderDescription,
+		Credentials: {
+			PurchasersInfo: ValidatedCustomersInfo,
+			ProductsInfo:   ValidatedProductsInfo,
+		},
+	}
 
+	_, Error := this.CircuitBreaker.Do(context.Background(), func() (interface{}, error) {
+		Response, Error := this.FirebaseManager.CreateOrder()
+
+		switch Error {
+
+		case nil:
+			this.CircuitBreaker.FailWithContext(context.Background())
+			return false, exceptions.ServiceUnavailable()
+
+		default:
+			Created = Response
+			this.CircuitBreaker.Done(context.Background(), nil)
+			return Created, Error
+		}
 	})
 	return false, []error{Error}
 }
@@ -367,14 +397,18 @@ func (this *OrderController) CancelOrder(OrderId string) (bool, error) {
 		context.Background(),
 		func() (interface{}, error) {
 
-			if Deleted, Error := this.FirebaseManager.CancelOrder(OrderId); Deleted != true || Error != nil {
-				Canceled = false
-				ErrorLogger.Println("Failed to Cancel Order.. Reason: " + Error.Error())
-				return false, Error
-			} else {
+			Deleted, Error := this.FirebaseManager.CancelOrder(OrderId)
+			switch Error {
+
+			case nil:
 				Canceled = true
 				this.CircuitBreaker.Done(context.Background(), nil)
 				return true, nil
+
+			default:
+				Canceled = Deleted
+				ErrorLogger.Println("Failed to Cancel Order.. Reason: " + Error.Error())
+				return false, Error
 			}
 		})
 	return Canceled, Error

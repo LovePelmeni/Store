@@ -18,7 +18,7 @@ pipeline {
 
         stage("build") {
             steps{
-                sh "docker build ${DOCKER_FILE_PATH} --name ${DOCKER_IMAGE_DESIRED_NAME}"
+                sh "docker build ${DOCKER_FILE_PATH} --name new_versioned_image"
                 sh "echo 'Image has beenImage has been built successfully.. Running Testing Stage'"
             }
         }
@@ -38,11 +38,11 @@ pipeline {
         stage("docker-deployment") {
             steps{
             sh "echo 'Running `Docker-Deployment` Stage.'"
-            sh "echo 'docker tag new_versioned_image ${env.DOCKERHUB_REPOSITORY_NAME}@${env.API_VERSION}'"
-            sh "echo 'docker push ${env.DOCKERHUB_REPOSITORY_NAME}@${env.API_VERSION}'"
+            sh "echo 'docker tag new_versioned_image ${env.DOCKERHUB_REPOSITORY_NAME}:latest'"
+            sh "echo 'docker push ${env.DOCKERHUB_REPOSITORY_NAME}:latest'"
             sh "echo 'Image has been pushed to Docker hub registry, Deploying Into Google Cloud Kubernetes Engine'"
             sh "echo 'Removing Local Image, In order to free the space for new potential versions..'"
-            sh "echo 'docker image rm ${env.DOCKER_IMAGE_DESIRED_NAME}:${env.API_VERSION}'"
+            sh "echo 'docker image rm ${env.DOCKER_IMAGE_DESIRED_NAME}:latest'"
             sh "echo '`Docker-Deployment` stage passed.. Going to `GCP-Build` Stage...'"
             }
         }
@@ -73,6 +73,6 @@ pipeline {
                 if checkKubernetesManifestUpdated() != true {sh "echo 'No Any Updates to the Cluster Yet'"}else{
                 sh "echo 'New Version were successfully deployed into cluster'"}
             }
-        }
+        }   
     }
 }

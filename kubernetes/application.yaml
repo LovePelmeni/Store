@@ -25,13 +25,6 @@ spec:
             - targetPort: 8005 
               protocol: TCP 
               port: 8005 
-          resources:
-            requests:
-              cpu: "0.5"
-              memory: "4Gi"
-            limits:
-              cpu: "0.7"
-              memory: "4Gi"
 
           # Variables that will determine right server credentials,
           # in order to make a healthcheck with right ip and port credentials.
@@ -47,4 +40,5 @@ spec:
               command: ["curl", "-f", "http://$(APPLICATION_IP_ADDRESS):$(APPLICATION_PORT)"]
               startPeriod: 30s 
               initialSeconds: 10
-    
+              
+        
