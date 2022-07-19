@@ -23,12 +23,8 @@ RUN add-apt-repository \
    
 RUN curl https://get.docker.com/ > dockerinstall && chmod 777 dockerinstall && ./dockerinstall
 
-VOLUME /var/run/docker.sock
+RUN groupadd docker 
 RUN adduser jenkins sudo
-RUN echo “jenkins ALL=NOPASSWD: ALL” >> /etc/sudoers
-
 # Adding Jenkins User to the Docker Group and Making it as an owner of the File.
 RUN usermod -aG docker jenkins 
-RUN chown root:jenkins /var/run/docker.sock  
-
 USER jenkins

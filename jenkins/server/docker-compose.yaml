@@ -3,7 +3,7 @@ services:
 
   jenkins_server:
     container_name: jenkins-master
-    image: jenkins/jenkins:lts 
+    build: ./
     user: root
     privileged: true 
     ports:
@@ -12,7 +12,6 @@ services:
     volumes:
       - /var/run/docker.sock/:/var/run/docker.sock 
       - /Users/kirillklimushin/jenkins_home/:/var/jenkins_home 
-      - /usr/local/bin/docker/:/usr/bin/docker
 
 
 
