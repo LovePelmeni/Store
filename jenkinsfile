@@ -1,12 +1,8 @@
 // Pipeline that Builds / Tests / Deploys the new Version of the Image.
 
-def docker (args) { // Method For Executing Docker Commands...
-    sh "${env.DOCKER}/docker ${args}"
-}
-
 pipeline{
 
-    agent any 
+    agent dockerfile {dir "./jenkins/agent" filename "Dockerfile"}
     environment {
         DOCKERHUB_CREDENTIALS=credentials("DockerHub") // Set Up Credentials at your Jenkins Server with Id :` DockerHub` and Your  Dockerhub Credentials
     }
@@ -15,97 +11,68 @@ pipeline{
             stage("build"){
 
                 steps{
-                    node("master") {
-                        script {
-                            def DockerTool = tool name: "docker", type: "org.jenkinsci.plugins.docker.commons.tools.DockerTool"
-                            withEnv(["DOCKER=${DockerTool}/bin"]){ // Setting Up Docker to allow it's usage in the pipeline..
-
-                                sh "echo 'Running Build Pipeline...'"
-                                sh "${env.DOCKER}/docker build -t new_versioned_image ."
-                                sleep 10 
-                                sh "echo 'Docker Built Image Successfully! And Initial Tests Has been Passed. Going to the Testing Stage..'"
-                            }
-                        }
-                    }
+                    sh "echo 'Running Build Pipeline...'"
+                    sh "docker build -t new_versioned_image ."
+                    sleep 10 
+                    sh "echo 'Docker Built Image Successfully! And Initial Tests Has been Passed. Going to the Testing Stage..'"
                 }
             }
 
             stage("test"){
+
                 steps{
+                    load "./version_env.groovy"
 
-                    node("master"){
-                    // checking for application health..
+                    sh "echo 'Running Test Pipeline'"
+                    sh "echo 'Running Healtcheck Test...'"
+                    sh "Sleeping until the Application will be fully ready..."
+                    sleep 10    
 
-                        script {
-                            def DockerTool = tool name: "docker", type: "org.jenkinsci.plugins.docker.commons.tools.DockerTool"
-                            withEnv(["DOCKER=${DockerTool}/bin"]){ // Setting Up Docker to allow it's usage in the pipeline..
-
-                                load "./version_env.groovy"
-
-                                    sh "echo 'Running Test Pipeline'"
-                                    sh "echo 'Running Healtcheck Test...'"
-                                    sh "Sleeping until the Application will be fully ready..."
-                                    sleep 10    
-
-                                script {
-                                    final String url = "http://${env.APPLICATION_HOST}:${APPLICATION_PORT}"
-                                    final def (String response, int code) =
-                                    sh(script: "curl -X GET -f $url", returnStdout: true).trim().tokenize("\n")
-                                
-                                    if (code == 200) {sh "echo Application health State Is Okay... Running Deployment Stage.."}else{
-                                        echo "Application Responded with Failure, Not Ready for Production..."
-                                        error "Health Check Stage Failure."
-                                    }
-                                }
-                            }
+                    script {
+                        final String url = "http://${env.APPLICATION_HOST}:${APPLICATION_PORT}"
+                        final def (String response, int code) =
+                        sh(script: "curl -X GET -f $url", returnStdout: true).trim().tokenize("\n")
+                                        
+                        if (code == 200) {sh "echo Application health State Is Okay... Running Deployment Stage.."}else{
+                            echo "Application Responded with Failure, Not Ready for Production..."
+                            error "Health Check Stage Failure."
                         }
-                    }
+                    } 
                 }
-            }   
+            }
+       
 
             stage("deployment"){
 
-                steps {  
-
-                    node("master"){
-
-                        script {
-                            def DockerTool = tool name: "docker", type: "org.jenkinsci.plugins.docker.commons.tools.DockerTool"
-                            withEnv(["DOCKER=${DockerTool}/bin"]){ // Setting Up Docker to allow it's usage in the pipeline..
-
-                                load "./version_env.groovy"
-                                load "./JenkinsCredentials.groovy" // Create A File Called `JenkinsCredentials` and Put There Credentials for `withCredentials` Statement.
+                load "./version_env.groovy"
+                load "./JenkinsCredentials.groovy" // Create A File Called `JenkinsCredentials` and Put There Credentials for `withCredentials` Statement.
                                 
-                                sh "echo 'Running Deployment Pipeline Stage...'"
-                                sh "echo 'Tagging new Image Version'"
+                sh "echo 'Running Deployment Pipeline Stage...'"
+                sh "echo 'Tagging new Image Version'"
 
-                                withCredentials([usernamePassword(
-                                    credentialsId: "DockerHub", // Credential Id that should be created at Jenkins Server...
-                                    usernameVariable: env.DOCKERHUB_CREDENTIALS_USR, // Credential Username that should be created at jenkins Server.
-                                    passwordVariable: env.DOCKERHUB_CREDENTIALS_PSW, // Credential Password that shoud be created at Jenkins Server..
-                                )]){
-                                    sh "${env.DOCKER}/docker login -u ${env.DOCKERHUB_USERNAME} -p ${env.DOCKERHUB_PASSWORD}"
-                                    sh "Logged In.. Into Docker."
+                withCredentials([usernamePassword(
+                    credentialsId: "DockerHub", // Credential Id that should be created at Jenkins Server...
+                    usernameVariable: env.DOCKERHUB_CREDENTIALS_USR, // Credential Username that should be created at jenkins Server.
+                    passwordVariable: env.DOCKERHUB_CREDENTIALS_PSW, // Credential Password that shoud be created at Jenkins Server..
+                )]){
+                    sh "docker login -u ${env.DOCKERHUB_USERNAME} -p ${env.DOCKERHUB_PASSWORD}"
+                    sh "Logged In.. Into Docker."
 
-                                    sh "echo 'Tagging An Image'"
-                                    sh "${env.DOCKER}/docker tag new_versioned_image ${env.DOCKERHUB_REPOSITORY_LINK}:latest"
-                                    sh "echo 'Tagged... Pushing onto docker repo.'"
+                    sh "echo 'Tagging An Image'"
+                    sh "docker tag new_versioned_image ${env.DOCKERHUB_REPOSITORY_LINK}:latest"
+                    sh "echo 'Tagged... Pushing onto docker repo.'"
 
-                                    sh "${env.DOCKER}/docker push ${env.DOCKERHUB_REPOSITORY_LINK}:latest"
+                    sh "docker push ${env.DOCKERHUB_REPOSITORY_LINK}:latest"
 
-                                    sh "echo 'Tagged Successfully.. Pushing Image On Docker Hub..'"
-                                    sh "echo 'Image has been Pushed Successfully! Pipeline Finished.'"
-                                }
-                            }
-                    }
+                    sh "echo 'Tagged Successfully.. Pushing Image On Docker Hub..'"
+                    sh "echo 'Image has been Pushed Successfully! Pipeline Finished.'"
                 }
                 
-                    post {
-                        always { 
-                            sh "${env.DOCKER}/docker rm -image new_versioned_image" // Removing Image in order to not to store it in the Agent..
-                            sh "Logging Out From Dockerhub..."
-                            sh "${env.DOCKER}/docker logout"
-                        }
+                post {
+                    always { 
+                        sh "docker rm -image new_versioned_image" // Removing Image in order to not to store it in the Agent..
+                        sh "Logging Out From Dockerhub..."
+                        sh "docker logout"
                     }
                 }
             }
