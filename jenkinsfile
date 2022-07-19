@@ -21,7 +21,7 @@ pipeline{
                             withEnv(["DOCKER=${DockerTool}/bin"]){ // Setting Up Docker to allow it's usage in the pipeline..
 
                                 sh "echo 'Running Build Pipeline...'"
-                                docker 'build . --name=new_versioned_image'
+                                docker "build -t new_versioned_image ."
                                 sleep 10 
                                 sh "echo 'Docker Built Image Successfully! And Initial Tests Has been Passed. Going to the Testing Stage..'"
                             }
