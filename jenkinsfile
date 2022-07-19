@@ -61,7 +61,7 @@ pipeline {
                     sh "echo 'Tagging new Image Version'"
 
                     withCredentials([
-                        credentialsId: "DockerHub" // Credential Id that should be created at Jenkins Server...
+                        credentialsId: "DockerHub", // Credential Id that should be created at Jenkins Server...
                         usernameVariable: env.DOCKERHUB_CREDENTIALS_USR, // Credential Username that should be created at jenkins Server.
                         passwordVariable: env.DOCKERHUB_CREDENTIALS_PSW, // Credential Password that shoud be created at Jenkins Server..
                     ]){
