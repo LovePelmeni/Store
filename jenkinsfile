@@ -44,28 +44,29 @@ pipeline{
 
             stage("deployment"){
 
-                load "./version_env.groovy"
-                load "./JenkinsCredentials.groovy" // Create A File Called `JenkinsCredentials` and Put There Credentials for `withCredentials` Statement.
-                                
-                sh "echo 'Running Deployment Pipeline Stage...'"
-                sh "echo 'Tagging new Image Version'"
+                steps {
+                    load "./version_env.groovy"
+            
+                    sh "echo 'Running Deployment Pipeline Stage...'"
+                    sh "echo 'Tagging new Image Version'"
 
-                withCredentials([usernamePassword(
-                    credentialsId: "DockerHub", // Credential Id that should be created at Jenkins Server...
-                    usernameVariable: env.DOCKERHUB_CREDENTIALS_USR, // Credential Username that should be created at jenkins Server.
-                    passwordVariable: env.DOCKERHUB_CREDENTIALS_PSW, // Credential Password that shoud be created at Jenkins Server..
-                )]){
-                    sh "docker login -u ${env.DOCKERHUB_USERNAME} -p ${env.DOCKERHUB_PASSWORD}"
-                    sh "Logged In.. Into Docker."
+                    withCredentials([usernamePassword(
+                        credentialsId: "DockerHub", // Credential Id that should be created at Jenkins Server...
+                        usernameVariable: env.DOCKERHUB_CREDENTIALS_USR, // Credential Username that should be created at jenkins Server.
+                        passwordVariable: env.DOCKERHUB_CREDENTIALS_PSW, // Credential Password that shoud be created at Jenkins Server..
+                    )]){
+                        sh "docker login -u ${env.DOCKERHUB_USERNAME} -p ${env.DOCKERHUB_PASSWORD}"
+                        sh "Logged In.. Into Docker."
 
-                    sh "echo 'Tagging An Image'"
-                    sh "docker tag new_versioned_image ${env.DOCKERHUB_REPOSITORY_LINK}:latest"
-                    sh "echo 'Tagged... Pushing onto docker repo.'"
+                        sh "echo 'Tagging An Image'"
+                        sh "docker tag new_versioned_image ${env.DOCKERHUB_REPOSITORY_LINK}:latest"
+                        sh "echo 'Tagged... Pushing onto docker repo.'"
 
-                    sh "docker push ${env.DOCKERHUB_REPOSITORY_LINK}:latest"
+                        sh "docker push ${env.DOCKERHUB_REPOSITORY_LINK}:latest"
 
-                    sh "echo 'Tagged Successfully.. Pushing Image On Docker Hub..'"
-                    sh "echo 'Image has been Pushed Successfully! Pipeline Finished.'"
+                        sh "echo 'Tagged Successfully.. Pushing Image On Docker Hub..'"
+                        sh "echo 'Image has been Pushed Successfully! Pipeline Finished.'"
+                    }
                 }
                 
                 post {
