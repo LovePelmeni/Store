@@ -1,0 +1,38 @@
+syntax = "proto3"; 
+package customers;
+
+option go_package = "customers";
+
+service PaymentCustomerService {
+
+    rpc CreateCustomer(CustomerCreateParams) returns (CustomerResponse);
+    rpc UpdateCustomer(CustomerUpdateParams) returns (CustomerResponse); 
+    rpc DeleteCustomer(CustomerDeleteParams) returns (CustomerResponse);
+}
+
+// Request Parameters....
+
+message CustomerCreateParams {
+
+}
+
+message CustomerUpdateParams {
+
+}
+
+message CustomerDeleteParams {
+
+}
+
+// States... 
+
+enum CustomerResponseState {
+
+}
+
+// Responses...
+
+message CustomerResponse {
+    repeated CustomerResponseState State = 1;
+}
+

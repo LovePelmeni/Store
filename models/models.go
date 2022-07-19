@@ -1,6 +1,7 @@
 package models
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
@@ -8,8 +9,11 @@ import (
 	_ "strings"
 	"time"
 
+	"errors"
 	"strconv"
+	"sync"
 
+	distributed_transaction_controllers "github.com/LovePelmeni/OnlineStore/StoreService/models/distributed_model_controllers"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -252,6 +256,9 @@ func (this *Customer) UpdateObject(
 	ObjId string,
 	UpdatedData struct{ Password string },
 	Validator BaseModelValidator,
+	CustomerGrpcClient distributed_transaction_controllers.PaymentServiceCustomerControllerInterface,
+	// Client That is responsible for making remote transactions.
+	// In this case, it is going to be used for Updated Remote Customer ORM Model Object from the `Payment Service.`
 
 ) (bool, []string) {
 
@@ -259,14 +266,35 @@ func (this *Customer) UpdateObject(
 	if Errors != nil {
 		return false, Errors
 	}
-
+	group := sync.WaitGroup{}
+	RequestContext, Cancel := context.WithCancel(context.Background())
 	Updated := Database.Table("customers").Updates(ValidatedData)
-	if Updated.Error != nil {
-		ErrorLogger.Println(
-			"Failed To Update Customer.")
-		return false, []string{Updated.Error.Error()}
-	} else {
-		return true, []string{}
+
+	go func(RequestContext context.Context) {
+		group.Add(1)
+		_, Error := CustomerGrpcClient.CreateRemoteCustomer()
+		if Error != nil {
+			Cancel()
+		} else {
+			RequestContext.Done()
+		} // If Operation succeeded calling, Done() else Calling Cancel Operation.
+		group.Done()
+
+	}(RequestContext)
+
+	group.Wait()
+
+	select { // Processing Response from the remote Transaction...
+
+	case <-RequestContext.Done():
+		Updated.Rollback()
+		ErrorLogger.Println("Failed to Process Remote Customer Transaction.")
+		return false, []string{errors.New("Update Customer Failure.").Error()}
+
+	case <-time.After(time.Duration(5)):
+		Updated.Commit()
+		InfoLogger.Println("Remote Customer has been created.")
+		return true, nil
 	}
 }
 
