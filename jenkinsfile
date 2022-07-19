@@ -7,7 +7,7 @@ def docker (args) { // Method For Executing Docker Commands...
 pipeline{
 
     agent any 
-    envinronment {
+    environment {
         DOCKERHUB_CREDENTIALS=credentials("DockerHub") // Set Up Credentials at your Jenkins Server with Id :` DockerHub` and Your  Dockerhub Credentials
     }
     stages {
