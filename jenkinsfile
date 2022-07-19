@@ -1,5 +1,9 @@
 // Pipeline that Builds / Tests / Deploys the new Version of the Image.
 
+def docker (args) { // Method For Executing Docker Commands...
+    sh "${DOCKER}/docker ${args}"
+}
+
 pipeline {
 
     agent any 
@@ -10,11 +14,6 @@ pipeline {
     node ("master") { 
 
     def DockerTool = tool name: "docker", type: "org.jenkinsci.plugins.docker.commons.tools.DockerTool"
-
-    def docker (args) { // Method For Executing Docker Commands...
-        sh "${DOCKER}/docker ${args}"
-    }
-
     withEnv(["DOCKER=${DockerTool}/bin"]){ // Setting Up Docker to allow it's usage in the pipeline..
 
         stages {
