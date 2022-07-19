@@ -80,9 +80,9 @@ To run the Full Microservice Using Docker-compose.yaml
 Depends on where you are going to run this application, 
 you need to check one of this Kubernetes Docs for this Project 
 
-~ [Deploying Store Microservice on Google Cloud]("https://github.com/LovePelmeni/Store/docs/kubernetes_docs/GCLOUD.md")
+~ "https://github.com/LovePelmeni/Store/docs/kubernetes_docs/GCLOUD.md" ~ *Deploying `Store Microservice` On Google Cloid*
 
-~ [Deploying Store Microservice on local Dev Machine]("https://github.com/LovePelmeni/Store/docs/kubernetes_docs/LOCAL_ENV.md")
+~ "https://github.com/LovePelmeni/Store/docs/kubernetes_docs/LOCAL_ENV.md" ~ *Deploying `Store Microservice` On Local Dev Machine with Minikube*
 
 --- 
 
@@ -90,9 +90,9 @@ you need to check one of this Kubernetes Docs for this Project
 
 Go Checkout Documentation Guide for Jenkings Continious Delivery / Integration Pipeline.
 
-~ [Setting Up Jenkins Pipeline For Local Development]("https://github.com/LovePelmeni/Store/docs/jenkins/LOCAL_ENV.md")
+~ "https://github.com/LovePelmeni/Store/docs/jenkins/LOCAL_ENV.md" ~ *Setting Up Jenkins Pipeline for `Store MicroService` For 
 
-~ [Setting up Jenkins Pipeline For Google Cloud Kubernetes Cluster]("https://github.com/LovePelmeni/Store/docs/jenkings/GCLOUD.md")
+~ "https://github.com/LovePelmeni/Store/docs/jenkings/GCLOUD.md" ~ *Setting Up Jenkins Pipeline for `Store MicroService` on the Google Cloud using Kubernetes*
 
 --- 
 

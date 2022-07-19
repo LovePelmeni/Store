@@ -13,7 +13,7 @@ def checkKubernetesManifestUpdated (containerName, namespace) {
 
 pipeline {
 
-    agent { dockerfile true }
+    agent any 
     load "./deployment.groovy"  // file for storing current Version Deployment Variables...
     load "./gke_credentials.groovy" // fire responsible for storing GKE Credentials...
 
@@ -25,7 +25,7 @@ pipeline {
 
         stage("build") {
             steps{
-                sh "docker build ${DOCKER_FILE_PATH} --name new_versioned_image"
+                sh "docker build . --name new_versioned_image"
                 sh "echo 'Image has beenImage has been built successfully.. Running Testing Stage'"
             }
         }
@@ -79,6 +79,10 @@ pipeline {
 
         post {
             always {
+                sh "Removing Docker Image from the Master Agent Store."
+                sh "docker rm -image new_versioned_image"
+
+                sh "Logging out from the DockerHub..."
                 sh "docker logout"
             }
         }
@@ -109,6 +113,6 @@ pipeline {
                 if checkKubernetesManifestUpdated() != true {sh "echo 'No Any Updates to the Cluster Yet'"}else{
                 sh "echo 'New Version were successfully deployed into cluster'"}
             }
-        }   
+        }
     }
 }
