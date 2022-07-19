@@ -73,13 +73,13 @@ spec:
             - name: POSTGRES_DB 
               valueFrom:
                 secretKeyRef:
-                  - name: postgres-config-map 
+                  - name: postgres-secret
                     value: POSTGRES_DB  
 
             - name: POSTGRES_USER 
               valueFrom:
                 secretKeyRef:
-                  - name: postgres-config-map 
+                  - name: postgres-secret
                     value: POSTGRES_USER 
 
             - name: POSTGRES_PASSWORD
