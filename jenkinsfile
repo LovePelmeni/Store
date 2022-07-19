@@ -4,19 +4,16 @@ def docker (args) { // Method For Executing Docker Commands...
     sh "${DOCKER}/docker ${args}"
 }
 
-pipeline {
+node ("master"){
 
     agent any 
     envinronment {
         DOCKERHUB_CREDENTIALS=credentials("DockerHub") // Set Up Credentials at your Jenkins Server with Id :` DockerHub` and Your  Dockerhub Credentials
     }
-
-    node ("master") { 
-
     def DockerTool = tool name: "docker", type: "org.jenkinsci.plugins.docker.commons.tools.DockerTool"
     withEnv(["DOCKER=${DockerTool}/bin"]){ // Setting Up Docker to allow it's usage in the pipeline..
 
-        stages {
+    stages {
 
             stage("build"){
                 steps{
@@ -88,5 +85,4 @@ pipeline {
             }
         }
     }
-}
 }
