@@ -20,17 +20,15 @@ RUN add-apt-repository \
    "deb [arch=amd64] https://download.docker.com/linux/debian \
    $(lsb_release -cs) \
    stable"
+   
+RUN curl https://get.docker.com/ > dockerinstall && chmod 777 dockerinstall && ./dockerinstall
 
-RUN sudo service docker start 
-
-RUN ls -la /var/run/docker.sock 
 VOLUME /var/run/docker.sock
-
 RUN adduser jenkins sudo
 RUN echo “jenkins ALL=NOPASSWD: ALL” >> /etc/sudoers
 
-RUN usermod -aG docker jenkins
-RUN chmod 777 /var/run/docker.sock
-RUN chown root:jenkins /var/run/docker.sock
+# Adding Jenkins User to the Docker Group and Making it as an owner of the File.
+RUN usermod -aG docker jenkins 
+RUN chown root:jenkins /var/run/docker.sock  
 
 USER jenkins
