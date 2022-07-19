@@ -9,7 +9,7 @@ pipeline {
 
     node ("master") { 
 
-    def DockerTool = tool: name "docker" type: "org.jenkinsci.plugins.docker.commons.tools.DockerTool"
+    def DockerTool = tool name: "docker", type: "org.jenkinsci.plugins.docker.commons.tools.DockerTool"
 
     def docker (args) { // Method For Executing Docker Commands...
         sh "${DOCKER}/docker ${args}"
