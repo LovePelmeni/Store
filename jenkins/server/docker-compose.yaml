@@ -1,0 +1,16 @@
+version: "3.8"
+services:
+
+  jenkins_server:
+    container_name: jenkins-server 
+    build: ./
+    user: root
+    privileged: true 
+    ports:
+      - 8090:8090 
+      - 8080:8080
+      - 50000:50000  
+    volumes:
+      - /var/run/docker.sock/:/var/run/docker.sock 
+      - /Users/kirillklimushin/jenkins_home/:/var/jenkins_home 
+    

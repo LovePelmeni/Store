@@ -299,8 +299,36 @@ func (this *Customer) UpdateObject(
 }
 
 func (this *Customer) DeleteObject(ObjId string) (bool, []string) {
-	return true, []string{}
+	Customer := Database.Table("customers").Where("id = ?", ObjId) 
+	if Customer.Error != nil {return false, []string{Customer.Error.Error()}}
+	DeletionTransaction := Database.Table("customers").Delete(&Customer) 
+
+	if DeletionTransaction.Error != nil {return false, []string{DeletionTransaction.Error.Error()}}else{
+		DeletionTransaction.SavePoint("pre-deletion")
+	}
+
+	group := sync.WaitGroup{}
+	RequestContext, CancelMethod := context.WithCancel(context.Background())
+
+	go func(Context context.Context) {
+		group.Add(1)
+		client := distributed_transaction_controllers.NewPaymentServiceCustomerController()
+		Response, Error := client.CreateRemoteCustomer(distributed_transaction_controllers.PaymentServiceCustomerCredentials{})
+		if Response != true || Error != nil {CancelMethod()}else{Context.Done()}
+		group.Done()
+	}(RequestContext)
+
+	group.Wait()
+	select {
+		case <- RequestContext.Done():
+			DeletionTransaction.Rollback()
+			return false, []string{errors.New("Failed to Create Customer.").Error()}
+		case <- time.After(time.Duration(2 * time.Second)): 
+			DeletionTransaction.Commit()
+			return true, nil 
+	}
 }
+
 
 type CartModelValidator struct {
 	// Validator Struct, that Represents Validator For `Cart` Model

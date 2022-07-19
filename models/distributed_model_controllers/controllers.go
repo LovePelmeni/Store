@@ -64,7 +64,7 @@ type PaymentServiceCustomerController struct {
 	GrpcCustomerClient *model_clients.GrpcCustomerClientInterface // client for interacting with Payment Service via Grpc.
 }
 
-func NewPaymentServiceCustomerController(GrpcCustomerClient *model_clients.GrpcCustomerClientInterface) *PaymentServiceCustomerController {
+func NewPaymentServiceCustomerController() *PaymentServiceCustomerController {
 	return &PaymentServiceCustomerController{CircuitBreaker: *circuitbreaker.New(
 		circuitbreaker.WithOpenTimeout(20),
 		circuitbreaker.WithOnStateChangeHookFn(func(oldState, newState circuitbreaker.State) {
