@@ -40,13 +40,14 @@ pipeline{
                     sleep 10    
 
                     script {
-                        final String url = "http://${env.APPLICATION_HOST}:${APPLICATION_PORT}/healthcheck/"
-                        final def (String response, int code) =
-                        sh(script: "curl -X GET -f $url", returnStdout: true).trim().tokenize("\n")
+
+                        command = """curl -s -X GET -H 'accept: */*' 'http://${env.APPLICATION_HOST}:${env.APPLICATION_PORT}/healthcheck/'"""
+                        responseStatus = sh(script: command, returnStdout: true).trim()
                                         
-                        if (code == 200) {sh "echo Application health State Is Okay... Running Deployment Stage.."}else{
+                        if (responseStatus != "200") {
                             sh "echo 'Application Responded with Failure, Not Ready for Production...'"
                             error "Health Check Stage Failure."
+                            }
                         }
                     } 
                 }

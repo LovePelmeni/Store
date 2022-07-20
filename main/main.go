@@ -19,7 +19,7 @@ import (
 )
 
 var (
-	APPLICATION_HOST = "localhost"
+	APPLICATION_HOST = os.Getenv("APPLICATION_HOST")
 	APPLICATION_PORT = os.Getenv("APPLICATION_PORT")
 
 	EMAIL_APPLICATION_HOST = os.Getenv("EMAIL_APPLICATION_HOST")
@@ -27,6 +27,9 @@ var (
 
 	ORDER_APPLICATION_HOST = os.Getenv("ORDER_APPLICATION_HOST")
 	ORDER_APPLICATION_PORT = os.Getenv("ORDER_APPLICATION_PORT")
+
+	PAYMENT_APPLICATION_HOST = os.Getenv("PAYMENT_APPLICATION_HOST")
+	PAYMENT_APPLICATION_PORT = os.Getenv("PAYMENT_APPLICATION_PORT")
 )
 
 var (
@@ -136,5 +139,5 @@ func main() {
 	}
 
 	DebugLogger.Println("Running HTTP Server...")
-	http.ListenAndServe(fmt.Sprintf(":%s", APPLICATION_PORT), Protection(router))
+	http.ListenAndServe(fmt.Sprintf("%s:%s", APPLICATION_HOST, APPLICATION_PORT), Protection(router))
 }
