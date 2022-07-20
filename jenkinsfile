@@ -56,9 +56,6 @@ pipeline{
                         dir("test_env"){
                             sh "echo 'Removing Testing Environment'"
                             sh "docker-compose down"
-                            sh "echo 'Removing Docker Container After Testing Stage...'"
-                            sh "docker rm new_versioned_container"
-                            sh "echo 'Container Has been Removed Successfully'"
                         }
                     }
                 }
