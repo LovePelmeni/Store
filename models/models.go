@@ -13,7 +13,7 @@ import (
 	"strconv"
 	"sync"
 
-	// RemoteCustomerControllers "github.com/LovePelmeni/OnlineStore/StoreService/models/model_controllers/customers"
+	RemoteCustomerControllers "github.com/LovePelmeni/OnlineStore/StoreService/models/payment_service_customers"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -272,7 +272,10 @@ func (this *Customer) UpdateObject(
 
 	go func(RequestContext context.Context) {
 		group.Add(1)
-		_, Error := CustomerGrpcClient.CreateRemoteCustomer()
+
+		_, Error := CustomerGrpcClient.CreateRemoteCustomer(
+			RemoteCustomerControllers.NewPaymentServiceCustomerCredentials(struct{}{}))
+
 		if Error != nil {
 			Cancel()
 		} else {
@@ -299,11 +302,15 @@ func (this *Customer) UpdateObject(
 }
 
 func (this *Customer) DeleteObject(ObjId string) (bool, []string) {
-	Customer := Database.Table("customers").Where("id = ?", ObjId) 
-	if Customer.Error != nil {return false, []string{Customer.Error.Error()}}
-	DeletionTransaction := Database.Table("customers").Delete(&Customer) 
+	Customer := Database.Table("customers").Where("id = ?", ObjId)
+	if Customer.Error != nil {
+		return false, []string{Customer.Error.Error()}
+	}
+	DeletionTransaction := Database.Table("customers").Delete(&Customer)
 
-	if DeletionTransaction.Error != nil {return false, []string{DeletionTransaction.Error.Error()}}else{
+	if DeletionTransaction.Error != nil {
+		return false, []string{DeletionTransaction.Error.Error()}
+	} else {
 		DeletionTransaction.SavePoint("pre-deletion")
 	}
 
@@ -312,23 +319,30 @@ func (this *Customer) DeleteObject(ObjId string) (bool, []string) {
 
 	go func(Context context.Context) {
 		group.Add(1)
+
 		client := RemoteCustomerControllers.NewPaymentServiceCustomerController()
-		Response, Error := client.CreateRemoteCustomer(RemoteCustomerControllers.PaymentServiceCustomerCredentials{})
-		if Response != true || Error != nil {CancelMethod()}else{Context.Done()}
+
+		Response, Error := client.CreateRemoteCustomer(
+			RemoteCustomerControllers.NewPaymentServiceCustomerCredentials(struct{}{}))
+
+		if Response != true || Error != nil {
+			CancelMethod()
+		} else {
+			Context.Done()
+		}
 		group.Done()
 	}(RequestContext)
 
 	group.Wait()
 	select {
-		case <- RequestContext.Done():
-			DeletionTransaction.Rollback()
-			return false, []string{errors.New("Failed to Create Customer.").Error()}
-		case <- time.After(time.Duration(2 * time.Second)): 
-			DeletionTransaction.Commit()
-			return true, nil 
+	case <-RequestContext.Done():
+		DeletionTransaction.Rollback()
+		return false, []string{errors.New("Failed to Create Customer.").Error()}
+	case <-time.After(time.Duration(2 * time.Second)):
+		DeletionTransaction.Commit()
+		return true, nil
 	}
 }
-
 
 type CartModelValidator struct {
 	// Validator Struct, that Represents Validator For `Cart` Model
