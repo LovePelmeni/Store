@@ -13,8 +13,13 @@ spec:
     host: store.com
     http:
       paths:
+
         path: "/"
         backend: 
-          serviceName: store-application-service 
+          serviceName: store-application-service  # Accessing Store Service from Outside...
           servicePort: 8010
-    
+
+        path: "/orders/service"  # Accessing Order Service From Outside...
+        backend: 
+          serviceName: order-application-service 
+          servicePort: 8090 

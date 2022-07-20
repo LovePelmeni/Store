@@ -4,6 +4,8 @@ pipeline{
     agent any 
     environment {
         DOCKERHUB_CREDENTIALS=credentials("DockerHub") // Set Up Credentials at your Jenkins Server with Id :` DockerHub` and Your  Dockerhub Credentials
+        APPLICATION_HOST="localhost"
+        APPLICATION_PORT="8000" // actual port of the nginx, where the requests will be routing to.
     }
     stages {
 
@@ -14,17 +16,16 @@ pipeline{
                     sh "docker network create global_store_network"
                     sh "echo 'Network Has been Created..'"
                     sh "echo 'Running Build Pipeline...'"
-                    sh "docker-compose up -d"
+                    sh "cd test_env/ && docker-compose up -d"
                     sleep 10 
                     sh "echo 'Docker Built Image Successfully! Running Container....'"
-                    sh "docker run new_versioned_image -p 8000:8000 --name new_versioned_container"
                 }
             }
 
             stage("test"){
 
                 steps{
-                    load "./version_env.groovy"
+                    load "./test_env/version_env.groovy"
 
                     sh "echo 'Running Test Pipeline'"
                     sh "echo 'Running Healtcheck Test...'"
@@ -56,7 +57,7 @@ pipeline{
             stage("deployment"){
 
                 steps {
-                    load "./version_env.groovy"
+                    load "./test_env/version_env.groovy"
             
                     sh "echo 'Running Deployment Pipeline Stage...'"
                     sh "echo 'Tagging new Image Version'"

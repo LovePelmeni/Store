@@ -13,7 +13,7 @@ spec:
       cpu: "800m"
       memory: "2Gi"
 
-  gcePersistentDisk:      # represents LInk to Google Cloud Compute Disk..                      
+  gcePersistentDisk:      # represents Link to Google Cloud Compute Disk..                      
     pgName: Jenkins-Disk  # You can create one by running: `gcloud compute disks create --zone=<your zone> --size=<your disk size>` 
     fsType: ext4
 
@@ -38,6 +38,26 @@ spec:
 
 --- 
 
+apiVersion: v1  # Service For handling Connection to the Jenkins Server...
+kind: Service
+metadata:
+  name: jenkins-application-service 
+  namespace: jenkins-namespace 
+spec:
+  selector:
+    app: jenkins-internal-service 
+  type: ClusterIP 
+  ports:
+    - name: httpport 
+      port: 8080 
+      targetPort: 8080
+
+    - name: jnlpport 
+      port: 50000 
+      targetPort: 50000 
+
+--- 
+
 apiVersion: v1
 kind: Deployment 
 metadata:
@@ -48,16 +68,22 @@ spec:
     matchLabels:
       app: jenkins-internal-service 
   template:
-    app: jenkins-server 
+    metadata:
+      labels:
+        app: jenkins-internal-service 
     containers:
       - name: jenkins-server 
-        image: jenkins/jenkins:lts 
+        image: crazycoderrr/jenkins_base # Custom Image That is already pre-configured.
         ports:
           - name: httpport
             containerPort: 8080 
+            targetPort: 8080
 
           - name: jnlpport 
             containerPort: 50000 
+            targetPort: 50000
+
+        imagePullPolicy: Always 
 
         resources:
           limits:
@@ -74,10 +100,17 @@ spec:
         
         VolumeMounts:
           - MountPath: /var/jenkins_home/ 
-            name: jenkins-volume-storage 
+            name: jenkins-volume-storage  
+
+          - MountPath: /var/run/docker.sock  # for accessing Docker Socket...
+            name: docker-socket-volume  
+
     Volumes:
       - name: jenkins-volume-storage 
         PersistentVolumeClaim:  
           - name: jenkins-claim 
+
+      - name: docker-socket-volume
+        value: /var/run/docker.sock 
 
         
