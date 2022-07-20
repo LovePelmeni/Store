@@ -40,16 +40,17 @@ pipeline{
                     sh "echo 'Sleeping until the Application will be fully ready...'"
                     sleep 10    
 
-                    // script {
+                    script {
 
-                    //     command = """curl -s -X GET -H 'accept: */*' 'http://${env.APPLICATION_HOST}:${env.APPLICATION_PORT}/healthcheck/'"""
-                    //     responseStatus = sh(script: command, returnStdout: true).trim()
+                        command = """curl -s -X GET -H 'accept: */*' -f 'http://${env.APPLICATION_HOST}:${env.APPLICATION_PORT}/healthcheck/'"""
+                        responseStatus = sh(script: command, returnStdout: true).trim()
                                         
-                    //     if (responseStatus != "200") {
-                    //         sh "echo 'Application Responded with Failure, Not Ready for Production...'"
-                    //         error "Health Check Stage Failure."
-                    //         }
-                    //     }
+                        if (responseStatus != "200") {
+                            sh "echo 'Application Responded with Failure, Not Ready for Production...'"
+                            error "Health Check Stage Failure."
+                            }
+                        }
+
                     } 
                 post {
                     always {
