@@ -50,7 +50,6 @@ pipeline{
                             }
                         }
                     } 
-                }
                 post {
                     always {
                         dir("test_env"){
@@ -58,7 +57,7 @@ pipeline{
                             sh "docker-compose down"
                         }
                     }
-                }
+                }  
             }
        
             stage("deployment"){
