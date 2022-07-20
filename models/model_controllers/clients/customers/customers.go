@@ -1,4 +1,4 @@
-package distributed_transaction_controllers
+package customers
 
 import (
 	"fmt"

@@ -14,7 +14,8 @@ pipeline{
                     sh "echo 'Running Build Pipeline...'"
                     sh "docker build -t new_versioned_image ."
                     sleep 10 
-                    sh "echo 'Docker Built Image Successfully! And Initial Tests Has been Passed. Going to the Testing Stage..'"
+                    sh "echo 'Docker Built Image Successfully! Running Container....'"
+                    sh "docker run new_versioned_image -p 8000:8000 --name new_versioned_container"
                 }
             }
 
@@ -39,9 +40,15 @@ pipeline{
                         }
                     } 
                 }
+                post {
+                    always {
+                        sh "echo 'Removing Docker Container After Testing Stage...'"
+                        sh "docker rm new_versioned_container"
+                        sh "echo 'Container Has been Removed Successfully'"
+                    }
+                }
             }
        
-
             stage("deployment"){
 
                 steps {

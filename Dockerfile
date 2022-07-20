@@ -18,9 +18,4 @@ COPY . .
 # Installing Dependencies + creating Vendor Directory.. + Running Tests...
 RUN go mod tidy
 # RUN go test -v ./tests/...  
-
-# Building Application...
-RUN go build -o ./main/main.go 
 ENTRYPOINT ["go", "run", "./main/main.go"]
-
-

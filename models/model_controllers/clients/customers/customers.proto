@@ -6,28 +6,28 @@ option go_package = "customers";
 service PaymentCustomerService {
 
     rpc CreateCustomer(CustomerCreateParams) returns (CustomerResponse);
-    rpc UpdateCustomer(CustomerUpdateParams) returns (CustomerResponse); 
     rpc DeleteCustomer(CustomerDeleteParams) returns (CustomerResponse);
 }
 
 // Request Parameters....
 
 message CustomerCreateParams {
-
-}
-
-message CustomerUpdateParams {
-
+    // Initial Credentials for Customer...
+    string Email = 1; 
+    string Username = 2;
 }
 
 message CustomerDeleteParams {
-
+    // Credentials for managing Customer Delete Operation...
+    string Email = 1;
+    string Username = 2;
 }
 
 // States... 
 
 enum CustomerResponseState {
-
+    Success = 1;
+    Failure = 2;
 }
 
 // Responses...

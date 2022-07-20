@@ -1,0 +1,43 @@
+syntax = "proto3"; 
+package products; 
+option go_package = "products";
+
+service PaymentProductService {
+
+    rpc CreateProduct(ProductCreateParams) returns (ProductResponse);
+    rpc UpdateProduct(ProductUpdateParams) returns (ProductResponse);
+    rpc DeleteProduct(ProductDeleteParams) returns (ProductResponse); 
+}
+
+message ProductCreateParams {
+    string ProductName = 1;
+    string ProductDescription = 2;
+    string Price = 3; 
+    string Currency = 4;
+    string OwnerId = 5; // Id of the Customer, that owns this Product...
+}
+
+
+message ProductUpdateParams{
+    // Params for Updating the Product...
+    string ProductName = 1;
+    string ProductDescription = 2; 
+    string Price = 3; 
+}
+
+message ProductDeleteParams {
+    // Params for Deleting Product...
+    string ProductId = 1;
+    string OwnerId = 2;
+}
+
+enum ProductStatus {
+    Success = 1;
+    Failure = 2;
+}
+
+message ProductResponse {
+    repeated enum ProductStatus = 1;
+}
+
+

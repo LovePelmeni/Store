@@ -13,7 +13,7 @@ import (
 	"strconv"
 	"sync"
 
-	distributed_transaction_controllers "github.com/LovePelmeni/OnlineStore/StoreService/models/distributed_model_controllers"
+	// RemoteCustomerControllers "github.com/LovePelmeni/OnlineStore/StoreService/models/model_controllers/customers"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -256,7 +256,7 @@ func (this *Customer) UpdateObject(
 	ObjId string,
 	UpdatedData struct{ Password string },
 	Validator BaseModelValidator,
-	CustomerGrpcClient distributed_transaction_controllers.PaymentServiceCustomerControllerInterface,
+	CustomerGrpcClient RemoteCustomerControllers.PaymentServiceCustomerControllerInterface,
 	// Client That is responsible for making remote transactions.
 	// In this case, it is going to be used for Updated Remote Customer ORM Model Object from the `Payment Service.`
 
@@ -312,8 +312,8 @@ func (this *Customer) DeleteObject(ObjId string) (bool, []string) {
 
 	go func(Context context.Context) {
 		group.Add(1)
-		client := distributed_transaction_controllers.NewPaymentServiceCustomerController()
-		Response, Error := client.CreateRemoteCustomer(distributed_transaction_controllers.PaymentServiceCustomerCredentials{})
+		client := RemoteCustomerControllers.NewPaymentServiceCustomerController()
+		Response, Error := client.CreateRemoteCustomer(RemoteCustomerControllers.PaymentServiceCustomerCredentials{})
 		if Response != true || Error != nil {CancelMethod()}else{Context.Done()}
 		group.Done()
 	}(RequestContext)
