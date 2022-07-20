@@ -43,14 +43,14 @@ func init() {
 }
 
 //go:generate mockgen -destination=mocks/customer.go --build_flags=--mod=mod . CustomerInterface
-type CustomerInterface interface {
+type RestCustomerControllerinterface interface {
 	// Interface for Managing Customer Model. Provides methods for CRUD operations.
 	// Such as...
 
-	ReceiveCustomer(customerId string) (*models.Customer, error)
-	CreateCustomer(customerData map[string]string)
-	UpdateCustomer(customerId string, UpdatedData ...map[string]string)
-	DeleteCustomer(customerId string)
+	ReceiveCustomer(context *gin.Context)
+	CreateCustomer(context *gin.Context)
+	UpdateCustomer(context *gin.Context)
+	DeleteCustomer(context *gin.Context)
 }
 
 // Validators
@@ -134,9 +134,11 @@ func UpdateCustomerRestController(context *gin.Context) {
 	updatedCustomerData := struct{ Password string }{
 		Password: context.PostForm("Password"),
 	}
-	updatedCustomer, Errors := customer.UpdateObject(customerId, updatedCustomerData, CustomerValidator)
 
-	if updatedCustomer == false {
+	updatedCustomer, Errors := customer.UpdateObject(
+		customerId, updatedCustomerData, CustomerValidator)
+
+	if updatedCustomer == false || len(Errors) != 0 {
 		context.JSON(
 			http.StatusNotImplemented, gin.H{"error": Errors})
 	}

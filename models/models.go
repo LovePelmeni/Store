@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"sync"
 
+	"github.com/LovePelmeni/OnlineStore/StoreService/exceptions"
 	RemoteCustomerControllers "github.com/LovePelmeni/OnlineStore/StoreService/models/payment_service_customers"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -83,7 +84,7 @@ type BaseModel interface {
 type BaseModelValidator interface {
 	// Base Interface for the ORM Model, that allows to
 	GetPatterns() map[string]string
-	Validate(map[string]string) (map[string]string, []string)
+	Validate(Credentials map[string]string) (map[string]string, []string)
 }
 
 // Because of microservice architecture, there is still some models in the bounded contexts,
@@ -94,7 +95,7 @@ type ProductModelValidator struct {
 	Patterns map[string]string // Map key: Product Model Field Name, Value: Regex for validating this field.
 }
 
-func NewProductModelValidator() *ProductModelValidator {
+func NewProductModelValidator() ProductModelValidator {
 	Patterns := map[string]string{
 		"OwnerEmail":         "", // default email regex.
 		"ProductName":        "",
@@ -103,10 +104,10 @@ func NewProductModelValidator() *ProductModelValidator {
 		"Currency":           "",            // Checks that the letters is all upper's, max length 3 letters,
 		// Example "USD", "EUR", "RUB" ...
 	}
-	return &ProductModelValidator{Patterns: Patterns}
+	return ProductModelValidator{Patterns: Patterns}
 }
 
-func (this *ProductModelValidator) Validate(Data map[string]string) (map[string]string, []string) {
+func (this ProductModelValidator) Validate(Data map[string]string) (map[string]string, []string) {
 
 	ValidationErrors := []string{}
 	for Property, Value := range Data {
@@ -123,7 +124,7 @@ func (this *ProductModelValidator) Validate(Data map[string]string) (map[string]
 	}
 }
 
-func (this *ProductModelValidator) GetPatterns() map[string]string {
+func (this ProductModelValidator) GetPatterns() map[string]string {
 	return this.Patterns
 }
 
@@ -213,21 +214,21 @@ type CustomerModelValidator struct {
 	Patterns map[string]string
 }
 
-func NewCustomerModelValidator() *CustomerModelValidator {
+func NewCustomerModelValidator() CustomerModelValidator {
 	Patterns := map[string]string{
 		"Username":  "", // default string regex + max length
 		"Password":  "", // default string regex + max length
 		"Email":     "", // default email regex.
 		"ProductId": "", // valid integer
 	}
-	return &CustomerModelValidator{Patterns: Patterns}
+	return CustomerModelValidator{Patterns: Patterns}
 }
 
-func (this *CustomerModelValidator) Validate(ObjectData map[string]string) (map[string]string, []string) {
+func (this CustomerModelValidator) Validate(ObjectData map[string]string) (map[string]string, []string) {
 	return ObjectData, []string{}
 }
 
-func (this *CustomerModelValidator) GetPatterns() map[string]string {
+func (this CustomerModelValidator) GetPatterns() map[string]string {
 	return this.Patterns
 }
 
@@ -256,7 +257,6 @@ func (this *Customer) UpdateObject(
 	ObjId string,
 	UpdatedData struct{ Password string },
 	Validator BaseModelValidator,
-	CustomerGrpcClient RemoteCustomerControllers.PaymentServiceCustomerControllerInterface,
 	// Client That is responsible for making remote transactions.
 	// In this case, it is going to be used for Updated Remote Customer ORM Model Object from the `Payment Service.`
 
@@ -266,39 +266,11 @@ func (this *Customer) UpdateObject(
 	if Errors != nil {
 		return false, Errors
 	}
-	group := sync.WaitGroup{}
-	RequestContext, Cancel := context.WithCancel(context.Background())
 	Updated := Database.Table("customers").Updates(ValidatedData)
-
-	go func(RequestContext context.Context) {
-		group.Add(1)
-
-		_, Error := CustomerGrpcClient.CreateRemoteCustomer(
-			RemoteCustomerControllers.NewPaymentServiceCustomerCredentials(struct{}{}))
-
-		if Error != nil {
-			Cancel()
-		} else {
-			RequestContext.Done()
-		} // If Operation succeeded calling, Done() else Calling Cancel Operation.
-		group.Done()
-
-	}(RequestContext)
-
-	group.Wait()
-
-	select { // Processing Response from the remote Transaction...
-
-	case <-RequestContext.Done():
-		Updated.Rollback()
-		ErrorLogger.Println("Failed to Process Remote Customer Transaction.")
-		return false, []string{errors.New("Update Customer Failure.").Error()}
-
-	case <-time.After(time.Duration(5)):
-		Updated.Commit()
-		InfoLogger.Println("Remote Customer has been created.")
-		return true, nil
+	if Updated.Error != nil {
+		return false, []string{exceptions.DatabaseOperationFailure().Error()}
 	}
+	return true, nil
 }
 
 func (this *Customer) DeleteObject(ObjId string) (bool, []string) {
@@ -386,7 +358,7 @@ type Cart struct {
 
 // Cart Create Controller ..
 
-func (this *Cart) CreateObject(Customer *Customer, Products []Product, Validator *BaseModelValidator) (*Cart, []string) {
+func (this *Cart) CreateObject(Customer *Customer, Products []Product, Validator BaseModelValidator) (*Cart, []string) {
 	// Creating Cart....
 	newCart := Cart{Owner: *Customer, Products: Products[0]}
 	Saved := Database.Table("carts").Save(&newCart)
@@ -401,7 +373,7 @@ func (this *Cart) CreateObject(Customer *Customer, Products []Product, Validator
 
 // Cart Update Controller...
 
-func (this *Cart) UpdateObject(ObjId string, UpdatedData struct{ Products []Product }, Validator *BaseModelValidator) (bool, []string) {
+func (this *Cart) UpdateObject(ObjId string, UpdatedData struct{ Products []Product }, Validator BaseModelValidator) (bool, []string) {
 	Updated := Database.Table("carts").Where("id = ?", ObjId).Updates(UpdatedData)
 	if Updated.Error != nil {
 		Updated.Rollback()

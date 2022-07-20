@@ -12,3 +12,11 @@ func ValidationError(InvalidData ...[]string) error {
 func OperationFailedError(OperationName ...string) error {
 	return errors.New(fmt.Sprintf("Operational Error. Operation: %s Failed.", OperationName))
 }
+
+func DatabaseOperationFailure() error {
+	return errors.New("Database Operation Failed...")
+}
+
+func ServiceUnavailable(ServiceName ...string) error {
+	return errors.New(fmt.Sprintf("Service `%s` is Unavailable.", ServiceName))
+}
