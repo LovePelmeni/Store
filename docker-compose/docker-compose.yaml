@@ -1,0 +1,43 @@
+version: "3.8"
+services:
+  
+  nginx_server:
+    container_name: application_nginx_server 
+    image: nginx:latest 
+    volumes:
+      - ../nginx/nginx.conf:/etc/nginx/nginx.conf
+    ports:
+      - 8010:80 
+    depends_on:
+      - store_application 
+    networks:
+      - global_store_network 
+  
+  store_application:
+    container_name: store-application-server 
+    build: . 
+    ports:
+      - 8000:8000 
+    networks:
+      - global_store_network 
+    depends_on:
+      - postgres_store_database 
+
+  postgres_store_database:
+    container_name: postgres_store_database 
+    image: postgres:latest 
+    environment:
+      POSTGRES_DB: store_db 
+      POSTGRES_USER: postgres_user 
+      POSTGRES_PASSWORD: postgres_password 
+    ports:
+      - 5435:5435 
+    command:
+      - -p 5435 
+    networks:
+      - global_store_network  
+
+networks:
+  global_store_network:
+    external: true 
+    name: global_store_network 
