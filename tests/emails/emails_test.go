@@ -6,7 +6,8 @@ import (
 
 	grpcControllers "github.com/LovePelmeni/EmailService/emails/proto/grpcControllers"
 	"github.com/LovePelmeni/OnlineStore/StoreService/external_services/emails"
-	mocked_emails "github.com/LovePelmeni/OnlineStore/StoreService/mocks/emails"
+
+	// mocked_emails "github.com/LovePelmeni/OnlineStore/StoreService/mocks/emails"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"

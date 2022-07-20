@@ -9,8 +9,9 @@ import (
 
 	"github.com/LovePelmeni/OnlineStore/StoreService/external_services/payments"
 	grpcControllers "github.com/LovePelmeni/OnlineStore/StoreService/external_services/payments/proto"
-	mock_intent "github.com/LovePelmeni/OnlineStore/StoreService/mocks/intent"
-	mock_session "github.com/LovePelmeni/OnlineStore/StoreServices/mocks/session"
+
+	// mock_intent "github.com/LovePelmeni/OnlineStore/StoreService/mocks/intent"
+	// mock_session "github.com/LovePelmeni/OnlineStore/StoreService/mocks/session"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
