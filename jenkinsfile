@@ -78,7 +78,7 @@ pipeline{
                         sh "echo 'Logged In.. Into Docker.'"
 
                         sh "echo 'Tagging An Image'"
-                        sh "docker tag new_versioned_image ${env.DOCKERHUB_REPOSITORY_LINK}:latest"
+                        sh "docker tag test_env_test_store_application ${env.DOCKERHUB_REPOSITORY_LINK}:latest"
                         sh "echo 'Tagged... Pushing onto docker repo.'"
 
                         sh "docker push ${env.DOCKERHUB_REPOSITORY_LINK}:latest"
@@ -91,10 +91,10 @@ pipeline{
                 post {
                     always { 
                         sh "echo 'Removing Default Netwokr for Testing Environment.'"
-                        sh "docker network rm global_store_network."
+                        sh "docker network rm global_store_network"
                         sh "echo 'Network Removed.'"
                         sh "echo 'Removing Image from local environment..'"
-                        sh "docker rm new_versioned_image'"
+                        sh "docker rm test_env_test_store_application'"
                         sh "echo 'Image has been removed..'"
                         script {
 
