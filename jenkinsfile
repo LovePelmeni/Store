@@ -2,7 +2,11 @@
 
 pipeline{
 
-    agent any 
+    agent {
+        dockerfile {
+            filename "Dockerfile"
+            dir "./jenkins/server"
+    }} 
     environment {
         DOCKERHUB_CREDENTIALS=credentials("DockerHub") // Set Up Credentials at your Jenkins Server with Id :` DockerHub` and Your  Dockerhub Credentials
     }
@@ -11,6 +15,9 @@ pipeline{
             stage("build"){
 
                 steps{
+                    sh "Creating Docker Network..."
+                    sh "docker network create global_store_network"
+                    sh "Network Has been Created.."
                     sh "echo 'Running Build Pipeline...'"
                     sh "docker-compose up -d"
                     sleep 10 
@@ -80,6 +87,9 @@ pipeline{
                 
                 post {
                     always { 
+                        sh "Removing Default Netwokr for Testing Environment."
+                        sh "docker network rm global_store_network."
+                        sh "Network Removed."
                         sh "Removing Image from local environment.."
                         sh "docker rm new_versioned_image"
                         sh "Image has been removed.."
