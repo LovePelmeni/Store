@@ -136,6 +136,5 @@ func main() {
 	}
 
 	DebugLogger.Println("Running HTTP Server...")
-	http.ListenAndServe(fmt.Sprintf("%s:%s",
-		APPLICATION_HOST, APPLICATION_PORT), Protection(router))
+	http.ListenAndServe(fmt.Sprintf(":%s", APPLICATION_PORT), Protection(router))
 }
