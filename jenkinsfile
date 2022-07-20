@@ -1,7 +1,7 @@
 // Pipeline that Builds / Tests / Deploys the new Version of the Image.
 
 pipeline{
-
+    agent any 
     environment {
         DOCKERHUB_CREDENTIALS=credentials("DockerHub") // Set Up Credentials at your Jenkins Server with Id :` DockerHub` and Your  Dockerhub Credentials
     }
