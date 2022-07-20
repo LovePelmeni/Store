@@ -6,6 +6,7 @@ services:
     build: ../.
     ports:
       - 8000:8000 
+    env_file: ../project_env.env 
     networks:
       - global_store_network 
     depends_on:
@@ -19,9 +20,9 @@ services:
       POSTGRES_USER: postgres_user 
       POSTGRES_PASSWORD: postgres_password 
     ports:
-      - 5435:5435 
+      - 5438:5438 
     command:
-      - -p 5435 
+      - -p 5438 
     networks:
       - global_store_network  
 
