@@ -12,7 +12,7 @@ pipeline{
 
                 steps{
                     sh "echo 'Running Build Pipeline...'"
-                    sh "docker build -t new_versioned_image ."
+                    sh "docker-compose up -d"
                     sleep 10 
                     sh "echo 'Docker Built Image Successfully! Running Container....'"
                     sh "docker run new_versioned_image -p 8000:8000 --name new_versioned_container"
@@ -42,6 +42,8 @@ pipeline{
                 }
                 post {
                     always {
+                        sh "echo 'Removing Testing Environment'"
+                        sh "docker-compose down"
                         sh "echo 'Removing Docker Container After Testing Stage...'"
                         sh "docker rm new_versioned_container"
                         sh "echo 'Container Has been Removed Successfully'"
@@ -78,7 +80,9 @@ pipeline{
                 
                 post {
                     always { 
-                        sh "docker rm -image new_versioned_image" // Removing Image in order to not to store it in the Agent..
+                        sh "Removing Image from local environment.."
+                        sh "docker rm new_versioned_image"
+                        sh "Image has been removed.."
                         sh "Logging Out From Dockerhub..."
                         sh "docker logout"
                     }
