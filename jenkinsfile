@@ -15,11 +15,11 @@ pipeline{
                     script {
                         def inspectDockerNetwork = sh script: "docker network create global_store_network", returnStatus: true  
 
-                        if (inspectDockerNetwork == 0) {
-                            sh "echo 'Creating Docker Network...'"
-                            sh "docker network create global_store_network"
-                            sh "echo 'Network Has been Created..'"
-                        }
+                        // if (inspectDockerNetwork == 0) {
+                        //     sh "echo 'Creating Docker Network...'"
+                        //     sh "docker network create global_store_network"
+                        //     sh "echo 'Network Has been Created..'"
+                        // }
                     }
                     dir("test_env"){
                         sh "docker-compose up -d"
