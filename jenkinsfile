@@ -21,10 +21,7 @@ pipeline{
                             sh "echo 'Creating Docker Network...'"
                             sh "docker network create global_store_network"
                             sh "echo 'Network Has been Created..'"
-                        else {
-                            sh "echo 'Network with name `global_store_network exists, Skipping....'"
                         }
-
                         sh "echo 'Running Build Pipeline...'"
                         sh "cd test_env/ && docker-compose up -d"
                         sleep 10 
@@ -106,9 +103,7 @@ pipeline{
                         if (loggingOut == 1){
                             sh "echo 'Logging Out From Dockerhub...'"
                             sh "docker logout"
-                        }else {
-                            sh "echo 'Already Logged Out. Skipping...'"
-                        }
+                            }   
                         }
                     }
                 }
