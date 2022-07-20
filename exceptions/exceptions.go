@@ -17,6 +17,10 @@ func DatabaseOperationFailure() error {
 	return errors.New("Database Operation Failed...")
 }
 
+func DatabaseRecordNotFound() error {
+	return errors.New("Database Record Not Found...")
+}
+
 func ServiceUnavailable(ServiceName ...string) error {
 	return errors.New(fmt.Sprintf("Service `%s` is Unavailable.", ServiceName))
 }
