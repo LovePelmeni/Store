@@ -13,7 +13,7 @@ pipeline{
 
                 steps{
                     script {
-                        def inspectDockerNetwork = sh script: "docker network create global_store_network", returnStatus: true  
+                        // def inspectDockerNetwork = sh script: "docker network create global_store_network", returnStatus: true  
 
                         // if (inspectDockerNetwork == 0) {
                         //     sh "echo 'Creating Docker Network...'"
