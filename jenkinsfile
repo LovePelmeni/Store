@@ -21,10 +21,6 @@ pipeline{
                             sh "docker network create global_store_network"
                             sh "echo 'Network Has been Created..'"
                         }
-                        sh "echo 'Running Build Pipeline...'"
-                        sh "cd test_env/ && docker-compose up -d"
-                        sleep 10 
-                        sh "echo 'Docker Built Image Successfully! Running Container....'"
                     }
                     dir("test_env"){
                         sh "docker-compose up -d"
