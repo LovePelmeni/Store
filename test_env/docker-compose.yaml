@@ -1,18 +1,18 @@
 version: "3.8"
 services:
   
-  store_application:
-    container_name: store-application-server 
+  test_store_application:
+    container_name: test_store_application_server 
     build: ../.
     ports:
       - 8000:8000 
     networks:
       - global_store_network 
     depends_on:
-      - postgres_store_database 
+      - test_postgres_store_database 
 
-  postgres_store_database:
-    container_name: postgres_store_database 
+  test_postgres_store_database:
+    container_name: test_postgres_store_database 
     image: postgres:latest 
     environment:
       POSTGRES_DB: store_db 
