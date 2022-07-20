@@ -32,7 +32,7 @@ spec:
         pathType: "Prefix"
         backend: 
           serviceName: store-application-service  # Accessing Store Service from Outside...
-          servicePort: 8010
+          servicePort: 8000
 
     host: store.orders.com # Subdomain for accessing orders Service....
       http: 

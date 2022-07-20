@@ -94,7 +94,7 @@ pipeline{
                         sh "docker network rm global_store_network"
                         sh "echo 'Network Removed.'"
                         sh "echo 'Removing Image from local environment..'"
-                        sh "docker rm test_env_test_store_application"
+                        sh "docker image rm test_env_test_store_application"
                         sh "echo 'Image has been removed..'"
                         script {
 
