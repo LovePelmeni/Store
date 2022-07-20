@@ -10,7 +10,6 @@ pipeline{
     }
 
     stages {
-
             stage("build"){
 
                 steps{
@@ -24,6 +23,11 @@ pipeline{
                         }
                         sh "echo 'Running Build Pipeline...'"
                         sh "cd test_env/ && docker-compose up -d"
+                        sleep 10 
+                        sh "echo 'Docker Built Image Successfully! Running Container....'"
+                    }
+                    dir("test_env"){
+                        sh "docker-compose up -d"
                         sleep 10 
                         sh "echo 'Docker Built Image Successfully! Running Container....'"
                     }
@@ -53,11 +57,13 @@ pipeline{
                 }
                 post {
                     always {
-                        sh "echo 'Removing Testing Environment'"
-                        sh "docker-compose down"
-                        sh "echo 'Removing Docker Container After Testing Stage...'"
-                        sh "docker rm new_versioned_container"
-                        sh "echo 'Container Has been Removed Successfully'"
+                        dir("test_env"){
+                            sh "echo 'Removing Testing Environment'"
+                            sh "docker-compose down"
+                            sh "echo 'Removing Docker Container After Testing Stage...'"
+                            sh "docker rm new_versioned_container"
+                            sh "echo 'Container Has been Removed Successfully'"
+                        }
                     }
                 }
             }
