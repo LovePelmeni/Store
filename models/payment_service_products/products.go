@@ -71,13 +71,13 @@ func (this *ProductRemoteTransactionParams) GetCredentials(Credentials *ProductR
 	if ValidatedCredentials, ValidationError := this.Validate(
 		Credentials); !ValidatedCredentials || ValidationError != nil {
 		DebugLogger.Println("Invalid Credentials to Create a Product.")
-		return false, exceptions.ValidationError()
+		return nil, exceptions.ValidationError()
 	}
 	return Credentials, nil
 }
 
 type ProductRemoteTransactionController struct {
-	GrpcProductClient GrpcProductControllers.ProductClient
+	GrpcProductClient interface{}
 	CircuitBreaker    circuitbreaker.CircuitBreaker
 }
 

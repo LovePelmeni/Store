@@ -61,7 +61,7 @@ func (this *PaymentServiceCustomerCredentials) GetCredentials(Credentials map[st
 
 type PaymentServiceCustomerController struct {
 	CircuitBreaker     circuitbreaker.CircuitBreaker
-	GrpcCustomerClient *model_clients.GrpcCustomerClientInterface // client for interacting with Payment Service via Grpc.
+	GrpcCustomerClient interface{} // client for interacting with Payment Service via Grpc.
 }
 
 func NewPaymentServiceCustomerController() *PaymentServiceCustomerController {
@@ -76,7 +76,7 @@ func NewPaymentServiceCustomerController() *PaymentServiceCustomerController {
 			}
 		}),
 		circuitbreaker.WithHalfOpenMaxSuccesses(10),
-	), GrpcCustomerClient: newGrpcCustomerClient()}
+	), GrpcCustomerClient: []interface{}{}}
 }
 
 func (this *PaymentServiceCustomerController) CreateRemoteCustomer(CustomerCredentials PaymentServiceCustomerCredentialsInterface) (bool, error)
