@@ -55,9 +55,13 @@ func NewPaymentServiceCustomerCredentials(Credentials struct{}) *PaymentServiceC
 	return &PaymentServiceCustomerCredentials{Credentials: Credentials}
 }
 
-func (this *PaymentServiceCustomerCredentials) Validate(Credentials map[string]string) (bool, error)
+func (this *PaymentServiceCustomerCredentials) Validate(Credentials map[string]string) (bool, error) {
+	return true, nil
+}
 
-func (this *PaymentServiceCustomerCredentials) GetCredentials(Credentials map[string]string) (PaymentServiceCustomerCredentialsInterface, error)
+func (this *PaymentServiceCustomerCredentials) GetCredentials(Credentials map[string]string) (PaymentServiceCustomerCredentialsInterface, error) {
+	return this, nil
+}
 
 type PaymentServiceCustomerController struct {
 	CircuitBreaker     circuitbreaker.CircuitBreaker
@@ -79,6 +83,10 @@ func NewPaymentServiceCustomerController() *PaymentServiceCustomerController {
 	), GrpcCustomerClient: []interface{}{}}
 }
 
-func (this *PaymentServiceCustomerController) CreateRemoteCustomer(CustomerCredentials PaymentServiceCustomerCredentialsInterface) (bool, error)
+func (this *PaymentServiceCustomerController) CreateRemoteCustomer(CustomerCredentials PaymentServiceCustomerCredentialsInterface) (bool, error) {
+	return true, nil
+}
 
-func (this *PaymentServiceCustomerController) DeleteRemoteCustomer(CustomerId string, CustomerEmail string, CustomerUsername string) (bool, error)
+func (this *PaymentServiceCustomerController) DeleteRemoteCustomer(CustomerId string, CustomerEmail string, CustomerUsername string) (bool, error) {
+	return true, nil
+}
