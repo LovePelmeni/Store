@@ -2,11 +2,6 @@
 
 pipeline{
 
-    agent {
-        dockerfile {
-            filename "Dockerfile"
-            dir "./jenkins/server"
-    }} 
     environment {
         DOCKERHUB_CREDENTIALS=credentials("DockerHub") // Set Up Credentials at your Jenkins Server with Id :` DockerHub` and Your  Dockerhub Credentials
     }
