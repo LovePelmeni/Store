@@ -33,12 +33,12 @@ pipeline{
 
                 steps{
                     sh "echo 'Tested...'"
-                    // load "./test_env/version_env.groovy"
+                    load "./test_env/version_env.groovy"
 
-                    // sh "echo 'Running Test Pipeline'"
-                    // sh "echo 'Running Healtcheck Test...'"
-                    // sh "echo 'Sleeping until the Application will be fully ready...'"
-                    // sleep 10    
+                    sh "echo 'Running Test Pipeline'"
+                    sh "echo 'Running Healtcheck Test...'"
+                    sh "echo 'Sleeping until the Application will be fully ready...'"
+                    sleep 10    
 
                     // script {
 
@@ -94,14 +94,13 @@ pipeline{
                         sh "docker network rm global_store_network"
                         sh "echo 'Network Removed.'"
                         sh "echo 'Removing Image from local environment..'"
-                        sh "docker rm test_env_test_store_application'"
+                        sh "docker rm test_env_test_store_application"
                         sh "echo 'Image has been removed..'"
                         script {
 
                         def loggingOut = sh script: "docker logout", returnStatus: true 
                         if (loggingOut == 1){
-                            sh "echo 'Logging Out From Dockerhub...'"
-                            sh "docker logout"
+                            sh "echo 'Logged out from Dockerhub. Pipeline Succeeded!'"
                             }   
                         }
                     }
