@@ -71,7 +71,7 @@ pipeline{
                         usernameVariable: env.DOCKERHUB_CREDENTIALS_USR, // Credential Username that should be created at jenkins Server.
                         passwordVariable: env.DOCKERHUB_CREDENTIALS_PSW, // Credential Password that shoud be created at Jenkins Server..
                     )]){
-                        sh "docker login -u ${env.DOCKERHUB_USERNAME} -p ${env.DOCKERHUB_PASSWORD}"
+                        sh "docker login -u ${env.DOCKERHUB_CREDENTIALS_USR} -p ${env.DOCKERHUB_CREDENTIALS_PSW}"
                         sh "Logged In.. Into Docker."
 
                         sh "echo 'Tagging An Image'"
