@@ -5,7 +5,6 @@ import (
 	"errors"
 	"log"
 	"os"
-	"strings"
 	"time"
 
 	"fmt"
@@ -17,8 +16,8 @@ import (
 )
 
 var (
-	GRPC_SERVER_HOST = os.Getenv("GRPC_SERVER_HOST")
-	GRPC_SERVER_PORT = os.Getenv("GRPC_SERVER_PORT")
+	GRPC_SERVER_HOST = os.Getenv("EMAIL_GRPC_SERVER_HOST")
+	GRPC_SERVER_PORT = os.Getenv("EMAIL_GRPC_SERVER_PORT")
 )
 
 var (
@@ -84,15 +83,12 @@ func NewGrpcEmailClient() *grpcEmailClient {
 		circuitbreaker.WithOnStateChangeHookFn(
 
 			func(old_state, new_state circuitbreaker.State) {
-				if hasPrefix := strings.HasPrefix(
-					strings.ToLower(string(new_state)), "cl"); hasPrefix == true {
-					DebugLogger.Println(
-						"Failed to Connect to Grpc Server of `Email` Service.",
-					)
-				}
-			}),
-	)}
-}
+				if old_state == "CLOSED" {ErrorLogger.Println("Circuit Breaker for Email Service is Open. Time: " + time.Now().String())}
+				if new_state == "CLOSED" {InfoLogger.Println("Circuit Breaker for Email Service Is Closed.. Requests Allowed. Time: " + time.Now().String())}
+				},
+			),
+		)}
+	}
 
 func (this *grpcEmailClient) getClient() (grpcControllers.EmailSenderClient, error) {
 
@@ -145,7 +141,8 @@ func NewGrpcEmailSender() *GrpcEmailSender {
 		circuitbreaker.WithOnStateChangeHookFn(func(old_state, new_state circuitbreaker.State) {
 			if new_state == "OPEN" {
 				ErrorLogger.Println("CircuitBreaker is UP, Failure in the Email Service. State: " + new_state)
-			} else {
+			}
+			if old_state == "OPEN"{ 
 				InfoLogger.Println("CircuitBreaker is closed.. Issue Fixed... State: " + new_state)
 			}
 		}),

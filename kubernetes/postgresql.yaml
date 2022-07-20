@@ -88,7 +88,7 @@ spec:
                   - name: postgres-config-map 
                     value: POSTGRES_PASSWORD 
           ports:
-            - TargetPort: 5435 
+            - targetPort: 5435 
             - port: 5435 
             - protocol: TCP 
           

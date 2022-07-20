@@ -161,21 +161,3 @@ func (this *CustomerRestControllerSuite) TestDeleteCustomer() {
 
 	assert.Equal(this.T(), count, 0, "Transactions Quantity Should be Equals to 0.")
 }
-
-// Product Rest Controllers
-
-type ProductRestControllerSuite struct {
-	suite.Suite
-}
-
-func (this *ProductRestControllerSuite) SetupTest() {}
-
-func TestProductRestControllerSuite(t *testing.T) {
-	suite.Run(t, new(ProductRestControllerSuite))
-}
-
-func (this *ProductRestControllerSuite) TestCreateProduct() {}
-
-func (this *ProductRestControllerSuite) TestUpdateProduct() {}
-
-func (this *ProductRestControllerSuite) TestDeleteProduct() {}

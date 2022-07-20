@@ -10,16 +10,20 @@ spec:
       - store.com
     secretName: IngressTLSSecret
   rules:
-    host: store.com
+    host: store.com # Domain For accessing Store Service...
     http:
       paths:
-
-        path: "/"
+        path: "/s"
+        pathType: "Prefix"
         backend: 
           serviceName: store-application-service  # Accessing Store Service from Outside...
           servicePort: 8010
 
-        path: "/orders/service"  # Accessing Order Service From Outside...
-        backend: 
-          serviceName: order-application-service 
-          servicePort: 8090 
+    host: store.orders.com # Subdomain for accessing orders Service....
+      http: 
+        paths:
+          path: "/o"  # Accessing Order Service From Outside...
+          pathType: "Prefix"
+          backend: 
+            serviceName: order-application-service 
+            servicePort: 8090 
