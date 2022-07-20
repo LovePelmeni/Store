@@ -1,11 +1,10 @@
 // Pipeline that Builds / Tests / Deploys the new Version of the Image.
-
 pipeline{
 
     agent any 
     environment {
         DOCKERHUB_CREDENTIALS=credentials("DockerHub") // Set Up Credentials at your Jenkins Server with Id :` DockerHub` and Your  Dockerhub Credentials
-        APPLICATION_HOST="localhost"
+        APPLICATION_HOST="0.0.0.0"
         APPLICATION_PORT="8000" // actual port of the nginx, where the requests will be routing to.
     }
 
@@ -41,7 +40,7 @@ pipeline{
                     sleep 10    
 
                     script {
-                        final String url = "http://${env.APPLICATION_HOST}:${APPLICATION_PORT}"
+                        final String url = "http://${env.APPLICATION_HOST}:${APPLICATION_PORT}/healthcheck/"
                         final def (String response, int code) =
                         sh(script: "curl -X GET -f $url", returnStdout: true).trim().tokenize("\n")
                                         

@@ -7,10 +7,11 @@ import (
 
 	"github.com/LovePelmeni/OnlineStore/StoreService/models"
 	jwt "github.com/dgrijalva/jwt-go"
+	"os"
 )
 
 var (
-	secretKey = "jwt-Secret-Key"
+	secretKey = os.Getenv("JWT_AUTH_SECRET_KEY")
 )
 
 var (

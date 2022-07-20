@@ -3,11 +3,12 @@ kind: PersistentVolume
 metadata: 
   name: postgres-database-volume 
   namespace: store-namespace 
-
 spec:
-  StorageClassName: PostgresVolume
+  StorageClassName: "PostgresVolume"
   capacity:
     storage: 10Gi 
+  accessModes:
+    - ReadWriteOnlyOnce 
   resources:
     limits: 
       cpu: "0.5"
@@ -27,9 +28,11 @@ metadata:
   name: persistent-volume-claim 
   namespace: store-namespace 
 spec:
-  StorageClassName: PostgresVolume 
+  StorageClassName: "PostgresVolume"
   capacity:
     storage: 10Gi 
+  accessModes:
+    - ReadWriteOnlyOnce
   resources:
     limits:
       cpu: "0.5"
@@ -56,7 +59,7 @@ data:
 
 --- 
 
-apiVersion: apps/v1 
+apiVersion: v1 
 kind: StatefulSet
 
 metadata:
@@ -94,6 +97,8 @@ spec:
           
           command: ["-p", "5435"]
 
+          imagePullPolicy: Never 
+
           volumeMounts:
             - mountPath: var/lib/postgres/data
               name: PostgresDataVolume
@@ -102,6 +107,4 @@ spec:
         name: PostgresDataVolume
         persistentVolumeClaim:
           claimName: persistent-postgres-claim
-
-
-
+          

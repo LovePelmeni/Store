@@ -123,13 +123,13 @@ stringData:
   PAYMENT_SERVICE_HOST: "payment-service" # Host of the Service that is references `Payment Service from another namespace`
   PAYMENT_SERVICE_PORT: payment-service.spec.ports[0].port # Port of the Service that is references `Payment Service from another namespace`
 
-  PAYMENT_GRPC_SERVER_HOST: payment-service 
+  PAYMENT_GRPC_SERVER_HOST: "payment-service" 
   PAYMENG_GRPC_SERVER_PORT: "50000" 
 
   # Email Service Credentials
   EMAIL_SERVICE_HOST: "email-service"  # Host of the Service that is references `Email Service from another namespace`
   EMAIL_SERVICE_PORT: email-service.spec.ports[0].port # Port of the service that is referencing `Email Service from another namespace`
 
-  EMAIL_GRPC_SERVER_HOST: email-service 
+  EMAIL_GRPC_SERVER_HOST: "email-service" 
   EMAIL_GRPC_SERVER_PORT: "50000" 
 
