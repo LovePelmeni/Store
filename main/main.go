@@ -98,7 +98,7 @@ func main() {
 	// HEALTHCHECK
 
 	router.GET("/healthcheck/", func(context *gin.Context) {
-		context.JSON(http.StatusOK, nil)
+		context.JSON(http.StatusOK, gin.H{"health": "true"})
 	})
 
 	// CUSTOMERS
