@@ -10,9 +10,9 @@ pipeline{
             stage("build"){
 
                 steps{
-                    sh "Creating Docker Network..."
+                    sh "echo 'Creating Docker Network...'"
                     sh "docker network create global_store_network"
-                    sh "Network Has been Created.."
+                    sh "echo 'Network Has been Created..'"
                     sh "echo 'Running Build Pipeline...'"
                     sh "docker-compose up -d"
                     sleep 10 
@@ -67,7 +67,7 @@ pipeline{
                         passwordVariable: env.DOCKERHUB_CREDENTIALS_PSW, // Credential Password that shoud be created at Jenkins Server..
                     )]){
                         sh "docker login -u ${env.DOCKERHUB_CREDENTIALS_USR} -p ${env.DOCKERHUB_CREDENTIALS_PSW}"
-                        sh "Logged In.. Into Docker."
+                        sh "echo 'Logged In.. Into Docker.'"
 
                         sh "echo 'Tagging An Image'"
                         sh "docker tag new_versioned_image ${env.DOCKERHUB_REPOSITORY_LINK}:latest"
@@ -82,13 +82,13 @@ pipeline{
                 
                 post {
                     always { 
-                        sh "Removing Default Netwokr for Testing Environment."
+                        sh "echo 'Removing Default Netwokr for Testing Environment.'"
                         sh "docker network rm global_store_network."
-                        sh "Network Removed."
-                        sh "Removing Image from local environment.."
-                        sh "docker rm new_versioned_image"
-                        sh "Image has been removed.."
-                        sh "Logging Out From Dockerhub..."
+                        sh "echo 'Network Removed.'"
+                        sh "echo 'Removing Image from local environment..'"
+                        sh "docker rm new_versioned_image'"
+                        sh "echo 'Image has been removed..'"
+                        sh "echo 'Logging Out From Dockerhub...'"
                         sh "docker logout"
                     }
                 }
