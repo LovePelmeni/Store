@@ -99,7 +99,7 @@ pipeline{
                         sh "echo 'Image has been removed..'"
                         script {
 
-                        def loggingOut = script: sh "docker logout", returnStatus: true 
+                        def loggingOut = sh script: "docker logout", returnStatus: true 
                         if (loggingOut == 1){
                             sh "echo 'Logging Out From Dockerhub...'"
                             sh "docker logout"
