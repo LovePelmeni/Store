@@ -37,7 +37,7 @@ pipeline{
 
                     sh "echo 'Running Test Pipeline'"
                     sh "echo 'Running Healtcheck Test...'"
-                    sh "Sleeping until the Application will be fully ready..."
+                    sh "echo 'Sleeping until the Application will be fully ready...'"
                     sleep 10    
 
                     script {
@@ -46,7 +46,7 @@ pipeline{
                         sh(script: "curl -X GET -f $url", returnStdout: true).trim().tokenize("\n")
                                         
                         if (code == 200) {sh "echo Application health State Is Okay... Running Deployment Stage.."}else{
-                            echo "Application Responded with Failure, Not Ready for Production..."
+                            sh "echo 'Application Responded with Failure, Not Ready for Production...'"
                             error "Health Check Stage Failure."
                         }
                     } 
