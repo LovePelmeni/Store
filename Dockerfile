@@ -2,7 +2,6 @@ FROM golang:1.18.3-alpine
 LABEL Creator=Klimushin_Kirill, Email=kirklimushin@gmail.com 
 RUN echo "Building Application... It is going to take some time..."
 
-ENV GIN_MODE=release 
 # Initializing Project Directory...
 CMD mkdir /project/dir/ 
 WORKDIR /project/dir/ 

@@ -15,7 +15,7 @@ services:
   
   store_application:
     container_name: store-application-server 
-    build: . 
+    build: ../.
     ports:
       - 8000:8000 
     networks:
