@@ -5,10 +5,8 @@ import (
 	"net/http"
 
 	"encoding/json"
-	"errors"
 
 	"fmt"
-	"reflect"
 	"sync"
 
 	"io"
@@ -19,52 +17,45 @@ import (
 	"github.com/LovePelmeni/OnlineStore/StoreService/authentication"
 	"github.com/LovePelmeni/OnlineStore/StoreService/models"
 	"github.com/gin-gonic/gin"
-	"gorm.io/gorm"
 )
 
 var (
-	DebugLogger *log.Logger
-	ErrorLogger *log.Logger
-	InfoLogger  *log.Logger
+	DebugLogger   *log.Logger
+	ErrorLogger   *log.Logger
+	InfoLogger    *log.Logger
+	WarningLogger *log.Logger
 )
 
 var product models.Product
+var products []models.Product
+var customer models.Customer
+var ProductValidator = models.NewProductModelValidator()
 
-func InitializeLoggers() {}
+type CustomerBalance string
 
-func init() {}
+func InitializeLoggers() (bool, error) {
+
+	LogFile, Error := os.OpenFile("Products.Log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
+	if Error != nil {
+		return false, Error
+	}
+	DebugLogger = log.New(LogFile, "DEBUG: ", log.Ldate|log.Llongfile|log.Ltime)
+	InfoLogger = log.New(LogFile, "INFO: ", log.Ldate|log.Llongfile|log.Ltime)
+	WarningLogger = log.New(LogFile, "WARNING: ", log.Ldate|log.Llongfile|log.Ltime)
+	ErrorLogger = log.New(LogFile, "ERROR: ", log.Ldate|log.Llongfile|log.Ltime)
+	return true, nil
+}
+
+func init() {
+	Initialized, Error := InitializeLoggers()
+	if Initialized != true || Error != nil {
+		panic("Failed To Initialize Loggers.")
+	}
+}
 
 // CUD Rest Controllers...
 
 func CreateProduct(context *gin.Context) {
-
-	InvalidFieldsErrors := []string{}
-	ModelPostValues := reflect.ValueOf(context.PostForm)
-	ModelPostNames := reflect.TypeOf(context.PostForm)
-
-	group := sync.WaitGroup{}
-
-	// Validating
-	go func() {
-		group.Add(1)
-
-		for PropertyIndex := 1; PropertyIndex < reflect.TypeOf(context.PostForm).NumField(); PropertyIndex++ {
-			if Valid := ModelPostValues.Field(PropertyIndex).IsValid; Valid() != false {
-				if len(ModelPostValues.Field(PropertyIndex).String()) == 0 {
-					InvalidFieldsErrors = append(InvalidFieldsErrors, fmt.Sprintf("Invalid Value for Field `%s`",
-						ModelPostNames.Field(PropertyIndex).Name))
-				}
-			} else {
-				continue
-			}
-		}
-		group.Done()
-	}()
-	group.Wait()
-
-	if len(InvalidFieldsErrors) != 0 {
-		context.JSON(http.StatusBadRequest, gin.H{"errors": InvalidFieldsErrors})
-	}
 
 	ProductValidator := models.NewProductModelValidator()
 	newProductCreated, Errors := product.CreateObject(
@@ -76,16 +67,23 @@ func CreateProduct(context *gin.Context) {
 		},
 		ProductValidator,
 	)
-	if newProductCreated == true || len(Errors) != 0 {
-		context.JSON(http.StatusOK, gin.H{"Errors": Errors})
+	if newProductCreated == false || Errors != nil {
+		context.JSON(http.StatusBadRequest, gin.H{"Errors": Errors})
+	} else {
+		context.JSON(http.StatusCreated, nil)
 	}
 }
 
 func UpdateProduct(context *gin.Context) {
 
+	var decodedData struct {
+		ProductName        string
+		ProductDescription string
+		ProductPrice       float64
+	}
 	productId := context.Query("productId")
 	bodyData, Error := io.ReadAll(context.Request.Body)
-	var InvalidFields []error
+	json.Unmarshal(bodyData, &decodedData)
 
 	if Error != nil {
 		InfoLogger.Println(
@@ -94,39 +92,10 @@ func UpdateProduct(context *gin.Context) {
 	}
 
 	Product := models.Database.Table("products").Where("id = ?", productId) // Receives the object..
-	if errors.Is(Product.Error, gorm.ErrRecordNotFound) {
-		context.JSON(http.StatusNotFound, nil)
+	Updated, Errors := product.UpdateObject(productId, decodedData, ProductValidator)
+	if Product.Error != nil || !Updated || Errors != nil {
+		context.JSON(http.StatusBadRequest, nil)
 	}
-
-	group := sync.WaitGroup{}
-
-	go func() {
-
-		group.Add(1)
-
-		structuredFields := reflect.TypeOf(&bodyData)
-		for PropertyIndex := 1; PropertyIndex < structuredFields.NumField(); PropertyIndex++ {
-
-			if len(reflect.ValueOf(structuredFields.Field(
-				PropertyIndex)).String()) == 0 { // Checking if the Field Value is empty...
-
-				InvalidFields = append(InvalidFields, errors.New(fmt.Sprintf("Invalid Value for Field `%s`",
-					structuredFields.Field(PropertyIndex).Name)))
-			}
-
-			group.Done()
-		}
-	}()
-
-	group.Wait()
-
-	if len(InvalidFields) != 0 {
-
-		serializedContext, Error := json.Marshal(InvalidFields)
-		_ = Error
-		context.JSON(http.StatusBadRequest, gin.H{"InvalidFields": serializedContext})
-	}
-
 	context.JSON(http.StatusCreated, nil)
 }
 
@@ -134,7 +103,7 @@ func DeleteProduct(context *gin.Context) {
 
 	ProductId := context.Query("ProductId")
 	Deleted, Errors := product.DeleteObject(ProductId)
-	if Deleted != true || len(Errors) != 0 {
+	if Deleted != true || Errors != nil {
 		context.JSON(
 			http.StatusNotImplemented, gin.H{"errors": Errors})
 	} else {
@@ -150,38 +119,16 @@ func GetTopWeekProducts(context *gin.Context) {
 	context.JSON(http.StatusOK, gin.H{"query": productsQuery})
 }
 
-func GetProductsCatalog(context *gin.Context) {
-
-	var products []models.Product
-	var customer models.Customer
-
-	var AnnotatedProducts []struct {
-		Product   models.Product
-		Available bool
-	}
-
-	jwtToken, error := context.Request.Cookie("jwt-token")
-	if error != nil {
-	}
-
-	ParsedJwtCredentials, JwtError := authentication.GetCustomerJwtCredentials(jwtToken.String())
-	if JwtError != nil {
-		DebugLogger.Println("Customer Is not Authenticated.")
-	}
+func CustomerBalanceReceiver(ResponseChannel chan CustomerBalance, CustomerUsername string, CustomerEmail string) {
 
 	Customer := models.Database.Table("customers").Where( // Receiving Customer.
 		"Email = ? AND username = ?",
-		ParsedJwtCredentials["email"],
-		ParsedJwtCredentials["username"]).First(&customer)
+		CustomerEmail,
+		CustomerUsername).First(&customer)
 
-	_ = Customer
+	if Customer.Error != nil {
 
-	group := sync.WaitGroup{}
-
-	var CustomerPaymentBalance struct{ Balance string }
-
-	go func() {
-		group.Add(1)
+		var CustomerPaymentBalance = struct{ Balance string }{}
 
 		client := http.Client{}
 		requestUrl := fmt.Sprintf("http://%s:%s/get/customer/info/",
@@ -197,44 +144,71 @@ func GetProductsCatalog(context *gin.Context) {
 		Response, Error := client.Do(request)
 
 		SerializedPaymentProfileInfo, Error := io.ReadAll(Response.Body)
-		DecodeError := json.Unmarshal(SerializedPaymentProfileInfo, &CustomerPaymentBalance)
-		if DecodeError != nil {
-			DebugLogger.Println("Failed to Parse Customer Balance..")
-		}
+		json.Unmarshal(SerializedPaymentProfileInfo, &CustomerPaymentBalance)
 
-	}() // Parsing Customer Balance..
-
-	Products := models.Database.Table("products").Find(&products)
-	if Products.Error != nil {
-		InfoLogger.Println("Failed to Parse Products Query.")
-		context.JSON(http.StatusNotImplemented, nil)
+		ResponseChannel <- CustomerBalance(CustomerPaymentBalance.Balance)
+		// returning Eventual Value... to the Channel
 	}
-	// If failed to Parse Balance, returns simple query of products...
-	if len(CustomerPaymentBalance.Balance) == 0 {
-		Query, Error := json.Marshal(Products)
-		if Error != nil {
-			context.JSON(
-				http.StatusNotImplemented, gin.H{"Error": Error.Error()})
-		} else {
-			context.JSON(http.StatusOK, gin.H{"products": Query})
-		}
-	} else {
+}
 
-		convertedBalance, Error := strconv.ParseFloat(CustomerPaymentBalance.Balance, 5)
-		if Error != nil {
-			DebugLogger.Println("Failed to Parse Customer balance to float.")
+func GetProductsCatalog(context *gin.Context) {
 
-			for _, row := range products {
-
-				IsAvailable := row.ProductPrice > convertedBalance
-				AnnotatedProducts = append(AnnotatedProducts, struct {
-					Product   models.Product
-					Available bool
-				}{Product: row, Available: IsAvailable})
-			}
-			context.JSON(http.StatusOK, gin.H{"products": AnnotatedProducts})
-		}
+	var AnnotatedProducts []struct {
+		Product   models.Product
+		Available bool
 	}
+
+	jwtToken, _ := context.Request.Cookie("jwt-token")
+	ParsedJwtCredentials, JwtError := authentication.GetCustomerJwtCredentials(jwtToken.String())
+	if JwtError != nil {
+		DebugLogger.Println("Customer Is not Authenticated.")
+	}
+
+	ResponseChannel := make(chan CustomerBalance, 10)                 // Creating A Channel to let goroutine to send Response.
+	go CustomerBalanceReceiver(ResponseChannel, ParsedJwtCredentials[ // Running goroutine that returns
+	"Username"], ParsedJwtCredentials["Email"])                       // the Customer Balance..
+
+	models.Database.Table("products").Find(&products) // Receiving Products from DB.
+
+	var serializedProducts []byte // Once the Response is returning,
+	//  the Products Serialized Context is getting put in this var
+	// after that defering response
+
+	// Method that returns Eventual HTTP Response to the Client...
+	defer func(products []byte) {
+		context.JSON(http.StatusOK, gin.H{"products": products})
+	}(serializedProducts)
+
+	select {
+	case <-ResponseChannel:
+
+		Balance := <-ResponseChannel
+
+		if len(string(Balance)) != 0 { // If Balance Is Not None,
+			// Making Product Annotations.. and returns Products Query.
+
+			group := sync.WaitGroup{}
+			convertedBalance, _ := strconv.ParseFloat(string(Balance), 5)
+
+			go func() {
+				group.Add(1)
+				for _, row := range products {
+					IsAvailable := row.ProductPrice > convertedBalance
+					AnnotatedProducts = append(AnnotatedProducts, struct {
+						Product   models.Product
+						Available bool
+					}{Product: row, Available: IsAvailable})
+				}
+				group.Done()
+			}()
+			group.Wait()
+
+			serializedProducts, _ = json.Marshal(products)
+		}
+	default:
+		serializedProducts, _ = json.Marshal(products)
+	}
+	defer close(ResponseChannel) // Closing Channel
 }
 
 func GetProduct(context *gin.Context) {
@@ -242,15 +216,9 @@ func GetProduct(context *gin.Context) {
 	productId := context.Query("productId")
 	var product *models.Product
 
-	Received := models.Database.Table("products").Where(
+	models.Database.Table("products").Where(
 		"id = ?", productId).First(&product)
-	if errors.Is(Received.Error, gorm.ErrRecordNotFound) {
-		context.JSON(http.StatusNotFound, gin.H{"error": "Product Not Found"})
-	}
-	serializedProduct, Error := json.Marshal(product)
-	if Error != nil {
-		ErrorLogger.Println("Failed to Serialize Product into JSON.")
-		context.JSON(http.StatusNotImplemented, nil)
-	}
+
+	serializedProduct, _ := json.Marshal(product)
 	context.JSON(http.StatusOK, gin.H{"product": serializedProduct})
 }

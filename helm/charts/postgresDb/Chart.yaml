@@ -4,8 +4,8 @@
 apiVersion: v1 
 kind: Service 
 metadata:
-  name: {{ ./values.email_service_name }}
-  namespace: {{ ./values.namespace }}
+  name: {{ .Values.email_service_name }}
+  namespace: {{ .Values.namespace }}
 spec:
   type: ExternalName 
   externalName: email-service.email-namespace.svc.cluster.local 
@@ -19,8 +19,8 @@ spec:
 apiVersion: v1 
 kind: Service 
 metadata:
-  name: {{ ./values.store_service_name }}
-  namespace: {{ ./values.namespace }}
+  name: {{ .Values.store_service_name }}
+  namespace: {{ .Values.namespace }}
 spec:
   type: ExternalName 
   externalName: store-service.store-namespace.svc.cluster.local 
@@ -34,8 +34,8 @@ spec:
 apiVersion: v1 
 kind: Service 
 metadata:
-  name: {{ ./values.order_service_name }}
-  namespace: {{ ./values.namespace }}
+  name: {{ .Values.order_service_name }}
+  namespace: {{ .Values.namespace }}
 spec:
   type: ExternalName 
   externalName: order-service.order-namespace.svc.cluster.local 
@@ -48,8 +48,8 @@ spec:
 apiVersion: v1 
 kind: Service 
 metadata:
-  name: {{ ./values.payment_service_name }}
-  namespace: {{ ./values.namespace }}
+  name: {{ .Values.payment_service_name }}
+  namespace: {{ .Values.namespace }}
 spec:
   type: ExternalName 
   externalName: payment-service.payment-namespace.svc.cluster.local 

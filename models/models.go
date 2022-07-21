@@ -70,6 +70,8 @@ func init() {
 	}
 }
 
+type ValidationError string
+
 // Model Abstractions...
 
 //go:generate -destination=StoreService/mocks/models.go --build_flags=--mod=mod . BaseModel
@@ -84,7 +86,7 @@ type BaseModel interface {
 type BaseModelValidator interface {
 	// Base Interface for the ORM Model, that allows to
 	GetPatterns() map[string]string
-	Validate(Credentials map[string]string) (map[string]string, []string)
+	Validate(Credentials map[string]string) (map[string]string, []ValidationError)
 }
 
 // Because of microservice architecture, there is still some models in the bounded contexts,
@@ -107,20 +109,20 @@ func NewProductModelValidator() ProductModelValidator {
 	return ProductModelValidator{Patterns: Patterns}
 }
 
-func (this ProductModelValidator) Validate(Data map[string]string) (map[string]string, []string) {
+func (this ProductModelValidator) Validate(Data map[string]string) (map[string]string, []ValidationError) {
 
-	ValidationErrors := []string{}
+	ValidationErrors := []ValidationError{}
 	for Property, Value := range Data {
 		if Valid, Error := regexp.MatchString(this.Patterns[Property], Value); Valid == false || Error != nil {
 			ValidationErrors =
-				append(ValidationErrors, fmt.Sprintf(
-					"Field `%s` is incorrect, Invalid Format.", Property))
+				append(ValidationErrors, ValidationError(fmt.Sprintf(
+					"Field `%s` is incorrect, Invalid Format.", Property)))
 		}
 	}
 	if len(ValidationErrors) != 0 {
 		return nil, ValidationErrors
 	} else {
-		return Data, []string{}
+		return Data, nil
 	}
 }
 
@@ -145,7 +147,7 @@ func (this *Product) CreateObject(
 	ObjectData map[string]string,
 	Validator BaseModelValidator,
 
-) (bool, []string) {
+) (bool, []ValidationError) {
 
 	ValidatedData, Errors := Validator.Validate(ObjectData)
 	if ValidatedData == nil || len(Errors) != 0 {
@@ -163,9 +165,9 @@ func (this *Product) CreateObject(
 	if LocalProductTransaction.Error != nil {
 		DebugLogger.Println("Failed to Save Product.")
 		return false,
-			[]string{"Failed To Save Product."}
+			[]ValidationError{ValidationError("Failed To Save Product.")}
 	} else {
-		return true, []string{}
+		return true, nil
 	}
 }
 
@@ -175,7 +177,8 @@ func (this *Product) UpdateObject(ObjId string,
 	UpdatedData struct {
 		ProductName        string
 		ProductDescription string
-	}, Validator BaseModelValidator) (bool, []string) {
+		ProductPrice       float64
+	}, Validator BaseModelValidator) (bool, []ValidationError) {
 
 	ValidatedData, Errors := Validator.Validate(map[string]string{
 		"ProductName":        UpdatedData.ProductName,
@@ -188,23 +191,23 @@ func (this *Product) UpdateObject(ObjId string,
 	Updated := Database.Table("products").Where("id = ?", ObjId).Updates(UpdatedData)
 	if Updated.Error != nil {
 		Updated.Rollback()
-		return false, []string{Updated.Error.Error()}
+		return false, []ValidationError{ValidationError("Updated Failure")}
 	} else {
 		Updated.Commit()
-		return true, []string{}
+		return true, nil
 	}
 }
 
 // Deleting Controller...
 
-func (this *Product) DeleteObject(ObjId string) (bool, []string) {
+func (this *Product) DeleteObject(ObjId string) (bool, []ValidationError) {
 	Deleted := Database.Table("products").Delete("id = ?", ObjId)
 	if Deleted.Error != nil {
 		Deleted.Rollback()
-		return false, []string{Deleted.Error.Error()}
+		return false, []ValidationError{ValidationError("Deletion Failure.")}
 	} else {
 		Deleted.Commit()
-		return true, []string{}
+		return true, nil
 	}
 }
 
@@ -224,8 +227,19 @@ func NewCustomerModelValidator() CustomerModelValidator {
 	return CustomerModelValidator{Patterns: Patterns}
 }
 
-func (this CustomerModelValidator) Validate(ObjectData map[string]string) (map[string]string, []string) {
-	return ObjectData, []string{}
+func (this CustomerModelValidator) Validate(ObjectData map[string]string) (map[string]string, []ValidationError) {
+	ValidationErrors := []ValidationError{}
+	for Property, Value := range ObjectData {
+		if Valid, Error := regexp.MatchString(this.Patterns[Property], Value); Valid != true || Error != nil {
+			ValidationErrors = append(ValidationErrors, ValidationError(
+				fmt.Sprintf("Invalid Value for Field `%s", Property)))
+		}
+	}
+	if len(ValidationErrors) != 0 {
+		return nil, ValidationErrors
+	} else {
+		return ObjectData, nil
+	}
 }
 
 func (this CustomerModelValidator) GetPatterns() map[string]string {
@@ -248,8 +262,8 @@ func (this *Customer) CreateObject(ObjectData struct {
 	Password  string
 	Email     string
 	CreatedAt time.Time
-}, Validator BaseModelValidator, PurchasedProducts ...[]Product) (*Customer, []string) {
-	return &Customer{}, []string{}
+}, Validator BaseModelValidator, PurchasedProducts ...[]Product) (*Customer, []ValidationError) {
+	return &Customer{}, nil
 }
 
 func (this *Customer) UpdateObject(
@@ -260,7 +274,7 @@ func (this *Customer) UpdateObject(
 	// Client That is responsible for making remote transactions.
 	// In this case, it is going to be used for Updated Remote Customer ORM Model Object from the `Payment Service.`
 
-) (bool, []string) {
+) (bool, []ValidationError) {
 
 	ValidatedData, Errors := Validator.Validate(map[string]string{"Password": UpdatedData.Password})
 	if Errors != nil {
@@ -268,20 +282,22 @@ func (this *Customer) UpdateObject(
 	}
 	Updated := Database.Table("customers").Updates(ValidatedData)
 	if Updated.Error != nil {
-		return false, []string{exceptions.DatabaseOperationFailure().Error()}
+		return false, []ValidationError{
+			ValidationError(exceptions.DatabaseOperationFailure().Error())}
 	}
 	return true, nil
 }
 
-func (this *Customer) DeleteObject(ObjId string) (bool, []string) {
+func (this *Customer) DeleteObject(ObjId string) (bool, []ValidationError) {
 	Customer := Database.Table("customers").Where("id = ?", ObjId)
 	if Customer.Error != nil {
-		return false, []string{Customer.Error.Error()}
+		return false, []ValidationError{ValidationError(Customer.Error.Error())}
 	}
 	DeletionTransaction := Database.Table("customers").Delete(&Customer)
 
 	if DeletionTransaction.Error != nil {
-		return false, []string{DeletionTransaction.Error.Error()}
+		return false, []ValidationError{ValidationError(
+			DeletionTransaction.Error.Error())}
 	} else {
 		DeletionTransaction.SavePoint("pre-deletion")
 	}
@@ -307,9 +323,12 @@ func (this *Customer) DeleteObject(ObjId string) (bool, []string) {
 
 	group.Wait()
 	select {
+
 	case <-RequestContext.Done():
 		DeletionTransaction.Rollback()
-		return false, []string{errors.New("Failed to Create Customer.").Error()}
+		return false, []ValidationError{
+			ValidationError(errors.New("Failed to Create Customer.").Error())}
+
 	case <-time.After(time.Duration(2 * time.Second)):
 		DeletionTransaction.Commit()
 		return true, nil
@@ -325,21 +344,21 @@ func NewCartModelValidator() *CartModelValidator {
 	return &CartModelValidator{Patterns: nil}
 }
 
-func (this *CartModelValidator) Validate(ObjectData map[string]string) (map[string]string, []string) {
+func (this *CartModelValidator) Validate(ObjectData map[string]string) (map[string]string, []ValidationError) {
 
-	ValidationErrors := []string{}
+	ValidationErrors := []ValidationError{}
 	for Property, Value := range ObjectData {
 
 		if Matches, Error := regexp.MatchString(this.Patterns[Property], Value); Matches != true || Error != nil {
 			ValidationErrors = append(
-				ValidationErrors, fmt.Sprintf("Invalid Value for Field `%s`", Property))
+				ValidationErrors, ValidationError(fmt.Sprintf("Invalid Value for Field `%s`", Property)))
 		}
 	}
 	if len(ValidationErrors) != 0 {
 		return nil,
 			ValidationErrors
 	} else {
-		return ObjectData, []string{}
+		return ObjectData, nil
 	}
 }
 
@@ -358,42 +377,42 @@ type Cart struct {
 
 // Cart Create Controller ..
 
-func (this *Cart) CreateObject(Customer *Customer, Products []Product, Validator BaseModelValidator) (*Cart, []string) {
+func (this *Cart) CreateObject(Customer *Customer, Products []Product, Validator BaseModelValidator) (*Cart, []ValidationError) {
 	// Creating Cart....
 	newCart := Cart{Owner: *Customer, Products: Products[0]}
 	Saved := Database.Table("carts").Save(&newCart)
 	if Saved.Error != nil {
 		Saved.Rollback()
-		return nil, []string{Saved.Error.Error()}
+		return nil, []ValidationError{ValidationError(Saved.Error.Error())}
 	} else {
 		Saved.Commit()
-		return &newCart, []string{}
+		return &newCart, nil
 	}
 }
 
 // Cart Update Controller...
 
-func (this *Cart) UpdateObject(ObjId string, UpdatedData struct{ Products []Product }, Validator BaseModelValidator) (bool, []string) {
+func (this *Cart) UpdateObject(ObjId string, UpdatedData struct{ Products []Product }, Validator BaseModelValidator) (bool, []ValidationError) {
 	Updated := Database.Table("carts").Where("id = ?", ObjId).Updates(UpdatedData)
 	if Updated.Error != nil {
 		Updated.Rollback()
-		return false, []string{Updated.Error.Error()}
+		return false, []ValidationError{ValidationError(Updated.Error.Error())}
 	} else {
 		Updated.Commit()
-		return true, []string{}
+		return true, nil
 	}
 }
 
 // Cart Delete Controller...
 
-func (this *Cart) DeleteObject(ObjId string) (bool, []string) {
+func (this *Cart) DeleteObject(ObjId string) (bool, []ValidationError) {
 	Deleted := Database.Table("carts").Where(
 		"id = ?", ObjId).Delete("id = ?", ObjId)
 	if Deleted.Error != nil {
 		Deleted.Rollback()
-		return false, []string{Deleted.Error.Error()}
+		return false, []ValidationError{ValidationError(Deleted.Error.Error())}
 	} else {
 		Deleted.Commit()
-		return true, []string{}
+		return true, nil
 	}
 }
