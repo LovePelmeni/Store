@@ -1,0 +1,59 @@
+# Chart that represents Services for Making Distributed Requests across several namespaces... 
+# Abstractions, that represents other service (located in another namespaces,), locally...
+
+apiVersion: v1 
+kind: Service 
+metadata:
+  name: {{ ./values.email_service_name }}
+  namespace: {{ ./values.namespace }}
+spec:
+  type: ExternalName 
+  externalName: email-service.email-namespace.svc.cluster.local 
+  ports:
+    - name: http 
+      targetPort: 8070 
+      port: 8070 
+
+--- 
+
+apiVersion: v1 
+kind: Service 
+metadata:
+  name: {{ ./values.store_service_name }}
+  namespace: {{ ./values.namespace }}
+spec:
+  type: ExternalName 
+  externalName: store-service.store-namespace.svc.cluster.local 
+  ports:
+    - name: http 
+      port: 8000 
+      targetPort: 8000 
+
+--- 
+
+apiVersion: v1 
+kind: Service 
+metadata:
+  name: {{ ./values.order_service_name }}
+  namespace: {{ ./values.namespace }}
+spec:
+  type: ExternalName 
+  externalName: order-service.order-namespace.svc.cluster.local 
+  ports:
+    - name: http 
+      targetPort: 8090 
+      port: 8090
+
+--- 
+apiVersion: v1 
+kind: Service 
+metadata:
+  name: {{ ./values.payment_service_name }}
+  namespace: {{ ./values.namespace }}
+spec:
+  type: ExternalName 
+  externalName: payment-service.payment-namespace.svc.cluster.local 
+  ports:
+    - name: http
+      targetPort: 8060 
+      port: 8060 

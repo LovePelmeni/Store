@@ -40,7 +40,7 @@ pipeline{
                     sleep 10    
 
                     script {
-
+                        
                         command = """curl -X GET -f 'http://${env.APPLICATION_HOST}:${env.APPLICATION_PORT}/healthcheck/'"""
                         responseStatus = sh(script: command, returnStdout: true).trim()
                                         

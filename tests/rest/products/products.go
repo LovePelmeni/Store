@@ -16,9 +16,9 @@ package test_rest_products
 // )
 
 // var (
-// 	DebugLogger *log.Logger 
-// 	InfoLogger *log.Logger 
-// 	ErrorLogger *log.Logger 
+// 	DebugLogger *log.Logger
+// 	InfoLogger *log.Logger
+// 	ErrorLogger *log.Logger
 // )
 
 // var (
@@ -35,10 +35,10 @@ package test_rest_products
 // 	if !Initialized || Error != nil {panic(Error)}
 // }
 // type RestProductControllerSuite struct {
-// 	suite.Suite 
-// 	RequestHeaders map[string]string // list of headers that should be applied for every request...  
+// 	suite.Suite
+// 	RequestHeaders map[string]string // list of headers that should be applied for every request...
 // 	ProductCreateData *models.Product
-// 	ProductUpdateData struct{ProductName string; 
+// 	ProductUpdateData struct{ProductName string;
 // 	ProductDescription string; ProductPrice string; Currency string}
 // }
 
@@ -55,13 +55,12 @@ package test_rest_products
 // 	}
 // }
 
-
 // func (this *RestProductControllerSuite) TestProductCreateController() {
 // 	RequestUrl := url.URL{Path: fmt.Sprintf("http://%s:%s/create/product/", ServerHost, ServerPort)}
 // 	Client := http.Client()
 // 	Request, Error := http.NewRequest("POST", RequestUrl.String(), nil)
 // 	assert.Equal(this.T(), Error, nil)
-// 	Response, Error := Client.Do(Request) 
+// 	Response, Error := Client.Do(Request)
 
 // 	assert.Equal(this.T(), Response.StatusCode, 200)
 // }
@@ -79,8 +78,7 @@ package test_rest_products
 // func (this *RestProductControllerSuite) TestProductDeleteController() {
 // 	RequestUrl := url.URL(fmt.Sprintf("http://%s:%s/delete/product/", ServerHost, ServerPort))
 // 	Client := http.Client()
-// 	Request, Error := http.NewRequest("DELETE", RequestUrl.String()) 
+// 	Request, Error := http.NewRequest("DELETE", RequestUrl.String())
 // 	if Error != nil {assert.Error(this.T(), Error, "Product Error.")}
 
-// } 
-
+// }
