@@ -4,7 +4,7 @@ pipeline{
     agent any 
     environment {
         DOCKERHUB_CREDENTIALS=credentials("DockerHub") // Set Up Credentials at your Jenkins Server with Id :` DockerHub` and Your  Dockerhub Credentials
-        APPLICATION_HOST="0.0.0.0"
+        APPLICATION_HOST="test_store_application" // Name of the Service Image will be running on.... in Docker-Compose
         APPLICATION_PORT="8000" // actual port of the nginx, where the requests will be routing to.
     }
 
@@ -32,7 +32,6 @@ pipeline{
             stage("test"){
 
                 steps{
-                    sh "echo 'Tested...'"
                     load "./test_env/version_env.groovy"
 
                     sh "echo 'Running Test Pipeline'"

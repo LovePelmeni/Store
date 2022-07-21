@@ -12,6 +12,13 @@ services:
     volumes:
       - /var/run/docker.sock/:/var/run/docker.sock 
       - /Users/kirillklimushin/jenkins_home/:/var/jenkins_home 
+    networks:
+      - global_project_network
+
+networks:
+  global_project_network:
+    external: true 
+    name: global_store_network 
 
 
 
