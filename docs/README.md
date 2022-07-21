@@ -6,7 +6,14 @@
 
 ## *Introduction* 
 
-Store Application.
+Store Microservice Is a Core Engine of the Project, that is Responsible for managing the Whole Application itself, it has access to
+
+`Email Microservice` ~ Repo : "https://github.com/LovePelmeni/EmailService.git" 
+`Payment Microservice` ~ Repo : "https://github.com/LovePelmeni/Payment-Service.git" 
+
+Also Communicating via `Firebase Real Time Database` with
+
+`Order Microservice` ~ Repo : "https://github.com/LovePelmeni/OrderService.git"
 
 --- 
 
@@ -90,7 +97,7 @@ you need to check one of this Kubernetes Docs for this Project
 
 Go Checkout Documentation Guide for Jenkings Continious Delivery / Integration Pipeline.
 
-~ "https://github.com/LovePelmeni/Store/docs/jenkins/LOCAL_ENV.md" ~ *Setting Up Jenkins Pipeline for `Store MicroService` For 
+~ "https://github.com/LovePelmeni/Store/docs/jenkins/LOCAL_ENV.md" ~ *Setting Up Jenkins Pipeline for `Store MicroService` in Docker in Local Environment*
 
 ~ "https://github.com/LovePelmeni/Store/docs/jenkings/GCLOUD.md" ~ *Setting Up Jenkins Pipeline for `Store MicroService` on the Google Cloud using Kubernetes*
 
