@@ -26,13 +26,13 @@ spec:
     secretName: ingress-tls-secret
   rules:
     host: store.com # Domain For accessing Store Service...
-    http:
-      paths:
-        path: "/s"
-        pathType: "Prefix"
-        backend: 
-          serviceName: store-application-service  # Accessing Store Service from Outside...
-          servicePort: 8000
+      http:
+        paths:
+          path: "/store/"
+          pathType: "Prefix"
+          backend: 
+            serviceName: store-application-service  # Accessing Store Service from Outside...
+            servicePort: 8000
 
     host: store.orders.com # Subdomain for accessing orders Service....
       http: 

@@ -8,7 +8,7 @@ pipeline{
         APPLICATION_PORT="8000" // actual port of the nginx, where the requests will be routing to.
     }
 
-    stages {
+    stages {    
             stage("build"){
 
                 steps{
@@ -87,7 +87,6 @@ pipeline{
                         sh "echo 'Image has been Pushed Successfully! Pipeline Finished.'"
                     }
                 }
-                
                 post {
                     always { 
                         sh "echo 'Removing Default Netwokr for Testing Environment.'"
