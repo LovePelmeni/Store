@@ -42,7 +42,7 @@ pipeline{
 
                     script {
 
-                        command = """curl -s -X GET -H 'accept: */*' -f 'http://${env.APPLICATION_HOST}:${env.APPLICATION_PORT}/healthcheck/'"""
+                        command = """curl -X GET -f 'http://${env.APPLICATION_HOST}:${env.APPLICATION_PORT}/healthcheck/'"""
                         responseStatus = sh(script: command, returnStdout: true).trim()
                                         
                         if (responseStatus != "200") {

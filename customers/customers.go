@@ -10,6 +10,8 @@ import (
 
 	"reflect"
 
+	"sync"
+
 	"github.com/LovePelmeni/OnlineStore/StoreService/authentication"
 	models "github.com/LovePelmeni/OnlineStore/StoreService/models"
 	"github.com/dgrijalva/jwt-go"
@@ -184,7 +186,7 @@ func GetCustomerProfileRestController(context *gin.Context) {
 
 	ParsedToken, JwtError := jwt.ParseWithClaims(jwtToken.String(), DecodedStructure,
 		func(token *jwt.Token) (interface{}, error) {
-			return []byte(os.Getenv("JWT-SECRET-KEY")), nil
+			return []byte(os.Getenv("JWT_AUTH_SECRET_KEY")), nil
 		})
 	_ = ParsedToken
 
@@ -199,7 +201,29 @@ func GetCustomerProfileRestController(context *gin.Context) {
 		context.JSON(http.StatusNotFound, nil)
 	}
 
-	jsonSerializedCustomer, EncodeError := json.Marshal(customerRef)
+	var PurchasedProductsCount int64
+	group := sync.WaitGroup{}
+
+	go func(customer *models.Customer) {
+		group.Add(1)
+		Error := models.Database.Table("customers").Where(
+			"id = ?", customer.Id).Select("PurchasedProducts").Count(&PurchasedProductsCount)
+		if Error.Error != nil {
+			PurchasedProductsCount = 0
+		}
+		group.Done()
+	}(&customerRef)
+
+	jsonSerializedCustomer, EncodeError := json.Marshal(
+		struct {
+			Username          string
+			Email             string
+			CreatedAt         string
+			PurchasedProducts int64
+		}{
+			Username: customerRef.Username, Email: customerRef.Email,
+			CreatedAt: customerRef.CreatedAt.String(), PurchasedProducts: PurchasedProductsCount})
+
 	if EncodeError != nil {
 		context.JSON(http.StatusNotImplemented, nil)
 	}
