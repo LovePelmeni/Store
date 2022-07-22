@@ -3,11 +3,12 @@ package authentication
 import (
 	"errors"
 	"log"
+
+	"os"
 	"time"
 
 	"github.com/LovePelmeni/OnlineStore/StoreService/models"
 	jwt "github.com/dgrijalva/jwt-go"
-	"os"
 )
 
 var (
@@ -45,7 +46,7 @@ type JwtToken struct {
 	Email    string
 }
 
-func CreateJwtToken(Username string, Email string) string {
+func CreateJwtToken(Username string, Email string) (string, error) {
 
 	ExpirationTime := time.Now().Add(10000 * time.Minute)
 	claims := JwtToken{
@@ -59,8 +60,9 @@ func CreateJwtToken(Username string, Email string) string {
 	stringToken, error := newToken.SignedString(secretKey)
 	if error != nil {
 		ErrorLogger.Println("Failed to Stringify JWT Token.")
+		return "", error
 	}
-	return stringToken
+	return stringToken, nil
 }
 
 type JwtValidator struct {
@@ -76,9 +78,8 @@ func CheckValidJwtToken(token string) error {
 
 	var customer models.Customer
 	DecodedData := &JwtToken{}
-	DecodedToken, error := jwt.ParseWithClaims(token, DecodedData,
+	_, error := jwt.ParseWithClaims(token, DecodedData,
 		func(token *jwt.Token) (interface{}, error) { return secretKey, nil })
-	_ = DecodedToken
 
 	if error != nil {
 		InfoLogger.Println("Invalid Jwt Token")
@@ -96,9 +97,8 @@ func CheckValidJwtToken(token string) error {
 func GetCustomerJwtCredentials(token string) (map[string]string, error) {
 
 	DecodedData := &JwtToken{}
-	DecodedToken, error := jwt.ParseWithClaims(token, DecodedData,
+	_, error := jwt.ParseWithClaims(token, DecodedData,
 		func(token *jwt.Token) (interface{}, error) { return secretKey, nil })
-	_ = DecodedToken
 
 	if error != nil {
 		InfoLogger.Println("Invalid Jwt Token")

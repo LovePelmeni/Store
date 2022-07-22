@@ -1,20 +1,17 @@
 package models
 
 import (
-	"context"
 	"fmt"
 	"log"
 	"os"
 	"regexp"
 	_ "strings"
+
+	"strconv"
+
 	"time"
 
-	"errors"
-	"strconv"
-	"sync"
-
 	"github.com/LovePelmeni/OnlineStore/StoreService/exceptions"
-	RemoteCustomerControllers "github.com/LovePelmeni/OnlineStore/StoreService/models/payment_service_customers"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -39,13 +36,13 @@ var (
 )
 
 var (
-	Database, error = gorm.Open(postgres.New(
-		postgres.Config{
-			DSN: fmt.Sprintf("host=%s port=%s dbname=%s user=%s password=%s",
-				POSTGRES_HOST, POSTGRES_PORT, POSTGRES_DATABASE, POSTGRES_USER, POSTGRES_PASSWORD),
-			PreferSimpleProtocol: true,
-		},
-	))
+	Database, error = gorm.Open(
+		postgres.Open(
+			fmt.Sprintf("postgres://%s:%s@%s:%s/%s",
+				POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_HOST, POSTGRES_PORT, POSTGRES_DATABASE),
+		),
+		&gorm.Config{},
+	)
 )
 
 /// Models ...
@@ -99,11 +96,11 @@ type ProductModelValidator struct {
 
 func NewProductModelValidator() ProductModelValidator {
 	Patterns := map[string]string{
-		"OwnerEmail":         "", // default email regex.
-		"ProductName":        "",
-		"ProductDescription": "",
-		"ProductPrice":       "[0-9].[0-9]", // checks that the product price has appropriate format, like: 0.00
-		"Currency":           "",            // Checks that the letters is all upper's, max length 3 letters,
+		"OwnerEmail":         "^[a-z0-9](.?[a-z0-9]){5,}@g(oogle)?mail.com$", // default email regex.
+		"ProductName":        "^[a-zA-z]{1,100}$",
+		"ProductDescription": "^.*{1,300}$",
+		"ProductPrice":       "^[0-9].[0-9]$",     // checks that the product price has appropriate format, like: 0.00
+		"Currency":           "^[A-z]/[A-z]{10}$", // Checks that the letters is all upper's, max length 3 letters,
 		// Example "USD", "EUR", "RUB" ...
 	}
 	return ProductModelValidator{Patterns: Patterns}
@@ -119,7 +116,7 @@ func (this ProductModelValidator) Validate(Data map[string]string) (map[string]s
 					"Field `%s` is incorrect, Invalid Format.", Property)))
 		}
 	}
-	if len(ValidationErrors) != 0 {
+	if ValidationErrors != nil {
 		return nil, ValidationErrors
 	} else {
 		return Data, nil
@@ -132,12 +129,13 @@ func (this ProductModelValidator) GetPatterns() map[string]string {
 
 type Product struct {
 	gorm.Model
-	Id                 int     `gorm:"BIGSERIAL NOT NULL PRIMARY KEY UNIQUE" json:"Id"`
-	OwnerEmail         string  `gorm:"VARCHAR(100) NOT NULL UNIQUE" json:"OwnerEmail"`
-	ProductName        string  `gorm:"VARCHAR(100) NOT NULL UNIQUE" json:"ProductName"`
-	ProductDescription string  `gorm:"VARCHAR(100) NOT NULL DEFAULT 'This Product Has No Description'" json:"ProductDescription"`
-	ProductPrice       float64 `gorm:"NUMERIC(10, 5) NOT NULL" json:"ProductPrice"`
-	Currency           string  `gorm:"VARCHAR(10) NOT NULL" json:"Currency"`
+	Id                 int     `gorm:"->;unique; BIGSERIAL NOT NULL PRIMARY KEY UNIQUE" json:"Id"`
+	OwnerEmail         string  `gorm:"<-:create;unique; VARCHAR(100) NOT NULL" json:"OwnerEmail"`
+	ProductName        string  `gorm:"<-;unique; VARCHAR(100) NOT NULL UNIQUE" json:"ProductName"`
+	ProductDescription string  `gorm:"<-; VARCHAR(300) NOT NULL DEFAULT 'This Product Has No Description'" json:"ProductDescription"`
+	ProductPrice       float64 `gorm:"<-; NUMERIC(10, 5) NOT NULL" json:"ProductPrice"`
+	Currency           string  `gorm:"<-; VARCHAR(10) NOT NULL" json:"Currency"`
+	CreatedAt          string  `gorm:"->;unique; DATE DEFAULT CURRENT DATE;" json:"CreatedAt"`
 }
 
 // Create Controller...
@@ -219,10 +217,9 @@ type CustomerModelValidator struct {
 
 func NewCustomerModelValidator() CustomerModelValidator {
 	Patterns := map[string]string{
-		"Username":  "", // default string regex + max length
-		"Password":  "", // default string regex + max length
-		"Email":     "", // default email regex.
-		"ProductId": "", // valid integer
+		"Username": "^[a-zA-z]{1,100}$",                            // default string regex + max length
+		"Password": "^[a-zA-z]{1,100}$",                            // default string regex + max length
+		"Email":    "^[a-z0-9](.?[a-z0-9]){5,}@g(oogle)?mail.com$", // default email regex.
 	}
 	return CustomerModelValidator{Patterns: Patterns}
 }
@@ -232,7 +229,7 @@ func (this CustomerModelValidator) Validate(ObjectData map[string]string) (map[s
 	for Property, Value := range ObjectData {
 		if Valid, Error := regexp.MatchString(this.Patterns[Property], Value); Valid != true || Error != nil {
 			ValidationErrors = append(ValidationErrors, ValidationError(
-				fmt.Sprintf("Invalid Value for Field `%s", Property)))
+				fmt.Sprintf("Invalid Value for Field `%s`", Property)))
 		}
 	}
 	if len(ValidationErrors) != 0 {
@@ -248,22 +245,41 @@ func (this CustomerModelValidator) GetPatterns() map[string]string {
 
 type Customer struct {
 	gorm.Model
-	Id                int    `gorm:"BIGSERIAL NOT NULL UNIQUE PRIMARY KEY"`
-	Username          string `gorm:"VARCHAR(100) NOT NULL UNIQUE" json:"Username"`
-	Password          string `gorm:"VARCHAR(100) NOT NULL" json:"Password"`
-	Email             string `gorm:"VARCHAR(100) NOT NULL UNIQUE" json:"Email"`
-	ProductId         string
-	PurchasedProducts Product   `gorm:"foreignKey:ProductId;references:Id;default:null;" json:"PurchasedProducts"`
-	CreatedAt         time.Time `gorm:"DATE DEFAULT CURRENT DATE" json:"CreatedAt"`
+	Id                  int     `gorm:"->; uniqueIndex; BIGSERIAL NOT NULL UNIQUE PRIMARY KEY;"`
+	Username            string  `gorm:"<-:create; unique; VARCHAR(100) NOT NULL;" json:"Username"`
+	Password            string  `gorm:"<-; VARCHAR(100) NOT NULL;" json:"Password"`
+	Email               string  `gorm:"<-:create; unique; VARCHAR(100) NOT NULL;" json:"Email"`
+	PurchasedProductsId string  `gorm:"<-;primaryKey;DEFAULT NULL;" json:"PurchasedProductsId"`
+	PurchasedProducts   Product `gorm:"-;foreignKey:Id;references:PurchasedProductsId;default:null;"`
+	CreatedAt           string  `gorm:"<-:create; index; DATE DEFAULT CURRENT DATE;;" json:"CreatedAt"`
 }
 
 func (this *Customer) CreateObject(ObjectData struct {
-	Username  string
-	Password  string
-	Email     string
-	CreatedAt time.Time
+	Username string
+	Password string
+	Email    string
 }, Validator BaseModelValidator, PurchasedProducts ...[]Product) (*Customer, []ValidationError) {
-	return &Customer{}, nil
+	ValidatedData, Errors := Validator.Validate(map[string]string{
+		"Username": ObjectData.Username,
+		"Email":    ObjectData.Email,
+		"Password": ObjectData.Password,
+	})
+	newCustomer := Customer{
+		Username:            ValidatedData["Username"],
+		Email:               ValidatedData["Email"],
+		Password:            ValidatedData["Password"],
+		CreatedAt:           time.Now().String(),
+		PurchasedProductsId: "",
+	}
+	if Errors != nil {
+		return nil, Errors
+	}
+	NewCustomerCreated := Database.Create(&newCustomer)
+	if NewCustomerCreated.Error != nil {
+		return nil, []ValidationError{ValidationError(
+			exceptions.DatabaseOperationFailure().Error())}
+	}
+	return &newCustomer, nil
 }
 
 func (this *Customer) UpdateObject(
@@ -299,37 +315,6 @@ func (this *Customer) DeleteObject(ObjId string) (bool, []ValidationError) {
 		return false, []ValidationError{ValidationError(
 			DeletionTransaction.Error.Error())}
 	} else {
-		DeletionTransaction.SavePoint("pre-deletion")
-	}
-
-	group := sync.WaitGroup{}
-	RequestContext, CancelMethod := context.WithCancel(context.Background())
-
-	go func(Context context.Context) {
-		group.Add(1)
-
-		client := RemoteCustomerControllers.NewPaymentServiceCustomerController()
-
-		Response, Error := client.CreateRemoteCustomer(
-			RemoteCustomerControllers.NewPaymentServiceCustomerCredentials(struct{}{}))
-
-		if Response != true || Error != nil {
-			CancelMethod()
-		} else {
-			Context.Done()
-		}
-		group.Done()
-	}(RequestContext)
-
-	group.Wait()
-	select {
-
-	case <-RequestContext.Done():
-		DeletionTransaction.Rollback()
-		return false, []ValidationError{
-			ValidationError(errors.New("Failed to Create Customer.").Error())}
-
-	case <-time.After(time.Duration(2 * time.Second)):
 		DeletionTransaction.Commit()
 		return true, nil
 	}
@@ -355,8 +340,7 @@ func (this *CartModelValidator) Validate(ObjectData map[string]string) (map[stri
 		}
 	}
 	if len(ValidationErrors) != 0 {
-		return nil,
-			ValidationErrors
+		return nil, ValidationErrors
 	} else {
 		return ObjectData, nil
 	}
@@ -368,11 +352,12 @@ func (this *CartModelValidator) GetPatterns() map[string]string {
 
 type Cart struct {
 	gorm.Model
-	Id         int
-	CustomerId string
-	ProductId  string
-	Owner      Customer `gorm:"foreignKey:CustomerId;references:Id;constraint:OnDelete:Cascade;" json:"Owner"`
-	Products   Product  `gorm:"foreignKey:ProductId;references:Id;" json:"Products"`
+	Id        int      `gorm:"->;BIGSERIAL NOT NULL PRIMARY KEY UNIQUE;"`
+	OwnerId   string   `gorm:"<-:create;unique;primaryKey;" json:"OwnerId"`
+	ProductId string   `gorm:"<-create;unique;primaryKey;" json:"ProductId"`
+	Owner     Customer `gorm:"foreignKey:Id;references:OwnerId;constraint:OnDelete:Cascade;"`
+	Products  Product  `gorm:"foreignKey:Id;references:ProductId;constraint:OnDelete:SET NULL;"`
+	CreatedAt string   `gorm:"->;DATE DEFAULT CURRENT DATE;"`
 }
 
 // Cart Create Controller ..

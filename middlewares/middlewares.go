@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"log"
+	"net/http"
 
 	"github.com/LovePelmeni/OnlineStore/StoreService/authentication"
 	"github.com/LovePelmeni/OnlineStore/StoreService/models"
@@ -24,13 +25,16 @@ func SetAuthHeaderMiddleware() gin.HandlerFunc {
 
 	return func(context *gin.Context) {
 
-		if hasAuthHeader := context.Request.Header.Get("AUTHORIZATION"); len(hasAuthHeader) == 0 {
+		switch {
+		case len(context.Request.Header.Get("AUTHORIZATION")) == 0:
 			AuthCookie, error := context.Request.Cookie("jwt-token")
 			if error != nil || AuthCookie == nil {
-				context.Request.Header.Set("Authorization", fmt.Sprintf("Bearer %s", AuthCookie))
+				context.Request.Header.Set("AUTHORIZATION", fmt.Sprintf("Bearer %s", AuthCookie.String()))
 			}
+			context.Next()
+		default:
+			context.Next()
 		}
-		context.Next()
 	}
 }
 
@@ -39,14 +43,17 @@ func JwtAuthenticationMiddleware() gin.HandlerFunc {
 	return func(context *gin.Context) {
 
 		jwtToken := context.Request.Header.Get("AUTHORIZATION")
-		if len(jwtToken) == 0 {
+		switch {
+		case len(jwtToken) == 0:
+			context.AbortWithStatusJSON(http.StatusForbidden, gin.H{"Error": "Not Authorized."})
 			return
-		}
-
-		if validationError := authentication.CheckValidJwtToken(jwtToken); validationError != nil {
+		case authentication.CheckValidJwtToken(jwtToken) != nil:
+			context.AbortWithStatusJSON(http.StatusForbidden,
+				gin.H{"Error": "Not Authorized."})
 			return
+		default:
+			context.Next()
 		}
-		context.Next()
 	}
 }
 
@@ -54,26 +61,30 @@ func JwtAuthenticationMiddleware() gin.HandlerFunc {
 
 func IsProductOwnerMiddleware() gin.HandlerFunc {
 
-	return func(context *gin.Context) {
+	return gin.HandlerFunc(func(context *gin.Context) {
 
 		var product models.Product
 		productId := context.Query("productId")
 
 		token, CookieError := context.Request.Cookie("jwt-token")
 		jwtParams, jwtError := authentication.GetCustomerJwtCredentials(token.String()) // customer that makes request...
-
-		if jwtError != nil || CookieError != nil {
-			DebugLogger.Println(
-				"Exceptions: " + CookieError.Error() + fmt.Sprintf("%s", jwtError))
-			return
-		}
 		models.Database.Table(
 			"products").Where("id = ?", productId).First(&product)
 
-		if isOwner := strings.ToLower(
-			product.OwnerEmail); isOwner == strings.ToLower(jwtParams["email"]) { // if customer is not an owner...
+		switch {
+		case jwtError != nil || CookieError != nil:
+			DebugLogger.Println(
+				"Exceptions: " + CookieError.Error() + fmt.Sprintf("%s", jwtError))
+			context.AbortWithStatusJSON(http.StatusForbidden, gin.H{"Error": "Does Not Have Enough Permissions to remove the  Product."})
 			return
+
+		case strings.ToLower(
+			product.OwnerEmail) != strings.ToLower(jwtParams["email"]): // if customer is not an owner...
+			context.AbortWithStatusJSON(http.StatusForbidden, gin.H{"Error": "Does not have enough permissions to Remove The Product."})
+			return
+
+		default:
+			context.Next()
 		}
-		context.Next()
-	}
+	})
 }

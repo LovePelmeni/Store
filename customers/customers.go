@@ -52,37 +52,42 @@ func CreateCustomerRestController(RequestContext *gin.Context) {
 	// Creates Customer
 
 	newCustomerData := struct {
-		Username  string
-		Password  string
-		Email     string
-		CreatedAt time.Time
+		Username string
+		Password string
+		Email    string
 	}{
-		Username:  RequestContext.PostForm("Username"),
-		Email:     RequestContext.PostForm("Email"),
-		Password:  RequestContext.PostForm("Password"),
-		CreatedAt: time.Now(),
+		Username: RequestContext.PostForm("Username"),
+		Email:    RequestContext.PostForm("Email"),
+		Password: RequestContext.PostForm("Password"),
 	}
 
 	NewCustomer, Errors := customer.CreateObject(newCustomerData, CustomerValidator, []models.Product{})
 	if NewCustomer == nil || Errors != nil {
-		serializedErrors, _ := json.Marshal(Errors)
+		serializedErrors := Errors
 
 		RequestContext.JSON(http.StatusBadRequest,
 			gin.H{"error": fmt.Sprintf(
 				"Failed to Create Customer. Error: %v", serializedErrors),
 			})
+	} else {
+
+		jwtToken, jwtError := authentication.CreateJwtToken(
+			NewCustomer.Username, NewCustomer.Email)
+
+		if jwtError != nil {
+			RequestContext.JSON(http.StatusNotImplemented, gin.H{
+				"Error": jwtError.Error()})
+		} else {
+
+			CookieAgeTime := 10000 * time.Minute
+			RequestContext.SetCookie(
+				"jwt-token", jwtToken, int(CookieAgeTime.Minutes()),
+				"/", "", true, true)
+
+			DebugLogger.Println("Customer has been created Successfully.")
+			RequestContext.JSON(http.StatusOK, gin.H{"customer": NewCustomer})
+		}
 	}
-
-	jwtToken := authentication.CreateJwtToken(
-		NewCustomer.Username, NewCustomer.Email)
-
-	CookieAgeTime := 10000 * time.Minute
-	RequestContext.SetCookie(
-		"jwt-token", jwtToken, int(CookieAgeTime.Minutes()),
-		"/", "", true, true)
-
-	DebugLogger.Println("Customer has been created Successfully.")
-	RequestContext.JSON(http.StatusOK, gin.H{"customer": NewCustomer})
 }
 
 func UpdateCustomerRestController(context *gin.Context) {
@@ -170,7 +175,7 @@ func GetCustomerProfileRestController(context *gin.Context) {
 			PurchasedProducts int64
 		}{
 			Username: customerRef.Username, Email: customerRef.Email,
-			CreatedAt: customerRef.CreatedAt.String(), PurchasedProducts: PurchasedProductsCount})
+			CreatedAt: customerRef.CreatedAt, PurchasedProducts: PurchasedProductsCount})
 
 	if EncodeError != nil {
 		context.JSON(http.StatusNotImplemented, nil)

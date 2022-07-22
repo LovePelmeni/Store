@@ -24,3 +24,5 @@ COPY . .
 RUN go mod tidy
 # RUN go test -v ./tests/...  
 ENTRYPOINT ["go", "run", "./main/main.go"]
+
+

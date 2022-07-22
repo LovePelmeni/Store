@@ -14,6 +14,8 @@ import (
 
 	"strconv"
 
+	"time"
+
 	"github.com/LovePelmeni/OnlineStore/StoreService/authentication"
 	"github.com/LovePelmeni/OnlineStore/StoreService/models"
 	"github.com/gin-gonic/gin"
@@ -208,6 +210,35 @@ func GetProductsCatalog(context *gin.Context) {
 		serializedProducts, _ = json.Marshal(products)
 	}
 	defer close(ResponseChannel) // Closing Channel
+}
+
+func GetPurchasedProducts(context *gin.Context) {
+
+	customerId := context.Query("customerId")
+	if len(customerId) != 0 {
+		context.JSON(http.StatusBadRequest, nil)
+	} else {
+
+		var responseQuery []struct {
+			Product         models.Product
+			AvailableRefund bool
+		}
+
+		models.Database.Table("customers").Association(
+			"PurchasedProductsId").DB.Order("CreatedAt desc").Find(&products)
+
+		for _, product := range products {
+			productPurchasedDate, _ := time.Parse("", product.CreatedAt)
+			if time.Now().YearDay()-productPurchasedDate.YearDay() > 7 {
+				responseQuery = append(responseQuery,
+					struct {
+						Product         models.Product
+						AvailableRefund bool
+					}{Product: product})
+			}
+		}
+		context.JSON(http.StatusOK, gin.H{"query": responseQuery})
+	}
 }
 
 func GetProduct(context *gin.Context) {
