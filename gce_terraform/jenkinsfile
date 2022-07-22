@@ -1,8 +1,12 @@
 // Pipeline for Applied Terraform Configuration in the Google Cloud Platform Project.
 pipeline {
     agent any 
+    environment {
+        REMOTE_GITHUB_TERRAFORM_STATE_STORE="https://github.com/LovePelmeni/Terraform-Config-Store.git"
+    }
+    
     stages {
-        stage("terraform-config-validation") {
+        stage("terraform-validating-configuration") {
             script {
                 Valid = (sh script: "terraform validate", returnStdout: true).Split(" ")
                 if (Valid[0] != "Success!") {
@@ -10,7 +14,15 @@ pipeline {
                 error "Invalid File."}else{echo "Terraform File Is Valid. Deploying..."}
             }
         }
-        stage("terraform-gce-update-deployment") {
+        stage("terraform-planning-configuration"){
+            script {
+                TerraformLogPlan = (sh script: "terraform plan", returnStdout: true) 
+                sh "echo 'Plan has been grabbed."
+                echo "Terraform Plan: $TerraformLogPlan"
+                echo "Applying new Configuration."
+            }
+        }
+        stage("terraform-applying-new-configuration") {
             
             steps {
                 script {
@@ -29,5 +41,21 @@ pipeline {
             recipientProviders: [[$class: "DevelopersRecipientProvider"], [$class: "RequesterRecipientProvider"]],
             subject: "Google Cloud Terraform Pipeline."
         }
+        stage("saving-terraform-updated-configuration"){
+            // logic of pushing new state file into backup repo....
+            sh "echo 'Initializing Backup Store Repo...."
+            sh "git remote set-url origin ${env.REMOTE_GITHUB_TERRAFORM_STATE_STORE}" 
+            sh "git checkout main"
+            sh "git add terraform/terraform-setup.tf" 
+            sh "git commit -m 'New Terraform State Version ${env.StateVersion}'" 
+            sh "git push -u origin main" 
+
+            post {
+                sh "rolling back to main repo.." 
+                sh "git remote set-url origin https://github.com/LovePelmeni/Store.git" 
+            }
+        }
     }
 }
+
+

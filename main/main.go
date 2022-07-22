@@ -15,7 +15,7 @@ import (
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
-	"github.com/gorilla/csrf"
+	_ "github.com/utrack/gin-csrf"
 )
 
 var (
@@ -63,9 +63,9 @@ func init() {
 
 	// Migrating into Postgresql
 	Failed := models.Database.AutoMigrate(
-		&models.Product{},
-		&models.Customer{},
 		&models.Cart{},
+		&models.Customer{},
+		&models.Product{},
 	)
 
 	if Failed != nil {
@@ -93,9 +93,17 @@ func main() {
 		AllowFiles:       true,
 	}))
 
+	// router.Use(csrf.Middleware(csrf.Options{
+	// 	Secret: os.Getenv("CSRF_SECRET_KEY"),
+	// 	ErrorFunc: func(context *gin.Context) {
+	// 		context.String(400, "CSRF token mismatch")
+	// 		context.Abort()
+	// 	},
+	// }))
+
 	// CSRF Goes there.
 
-	Protection := csrf.Protect([]byte(os.Getenv("CSRF_TOKEN_SECRET_KEY")))
+	// Protection := csrf.Protect([]byte(os.Getenv("CSRF_TOKEN_SECRET_KEY")))
 
 	// HEALTHCHECK
 
@@ -103,12 +111,12 @@ func main() {
 		context.JSON(http.StatusOK, nil)
 	})
 
+	router.POST("create/customer/", customers.CreateCustomerRestController) // AllowAny
+
 	// CUSTOMERS
-	router.Use(middlewares.SetAuthHeaderMiddleware(),
-		middlewares.JwtAuthenticationMiddleware())
+	router.Use(middlewares.JwtAuthenticationMiddleware())
 	{
-		router.GET("get/profile/", customers.GetCustomerProfileRestController)    // Is Authenticated
-		router.POST("create/customer/", customers.CreateCustomerRestController)   // AllowAny
+		router.GET("get/profile/", customers.GetCustomerProfileRestController)    // Is Authenticated   // AllowAny
 		router.PUT("update/customer/", customers.UpdateCustomerRestController)    // Is Authenticated
 		router.DELETE("delete/customer/", customers.DeleteCustomerRestController) // Is Authenticated
 	}
@@ -137,5 +145,5 @@ func main() {
 		router.GET("/popular/week/products", products.GetTopWeekProducts) // AllowAny
 	}
 	DebugLogger.Println("Running HTTP Server...")
-	http.ListenAndServe(fmt.Sprintf("%s:%s", APPLICATION_HOST, APPLICATION_PORT), Protection(router))
+	http.ListenAndServe(fmt.Sprintf("%s:%s", APPLICATION_HOST, APPLICATION_PORT), router)
 }
