@@ -202,7 +202,6 @@ func GetProductsCatalog(context *gin.Context) {
 				group.Done()
 			}()
 			group.Wait()
-
 			serializedProducts, _ = json.Marshal(products)
 		}
 	default:

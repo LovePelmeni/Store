@@ -102,6 +102,11 @@ pipeline{
                             sh "echo 'Logged out from Dockerhub. Pipeline Succeeded!'"
                             }   
                         }
+                        // Sending Email Notification About the Pipeline State.
+                        emailtext body: "Store CI/CD Pipeline Has been Finished. Please Review The Results.",
+                        recipientProviders: [[$class: "DevelopersRecipientProvider"], [$class: "RequesterRecipientProvider"]],
+                        subject: "Google Cloud Terraform Pipeline."
+        
                     }
                 }
             }

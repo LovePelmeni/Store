@@ -56,7 +56,6 @@ func InitializeLoggers() (bool, error) {
 func init() {
 
 	// Initializing Loggers...
-
 	Initialized, Error := InitializeLoggers()
 	if Error != nil || Initialized == false {
 		panic(Error)
@@ -108,10 +107,10 @@ func main() {
 	router.Use(middlewares.SetAuthHeaderMiddleware(),
 		middlewares.JwtAuthenticationMiddleware())
 	{
-		router.GET("get/profile/:customerId/", customers.GetCustomerProfileRestController)   // Is Authenticated
-		router.POST("create/customer/", customers.CreateCustomerRestController)              // AllowAny
-		router.PUT("update/customer/:customerId", customers.UpdateCustomerRestController)    // Is Authenticated
-		router.DELETE("delete/customer/:customerId", customers.DeleteCustomerRestController) // Is Authenticated
+		router.GET("get/profile/", customers.GetCustomerProfileRestController)    // Is Authenticated
+		router.POST("create/customer/", customers.CreateCustomerRestController)   // AllowAny
+		router.PUT("update/customer/", customers.UpdateCustomerRestController)    // Is Authenticated
+		router.DELETE("delete/customer/", customers.DeleteCustomerRestController) // Is Authenticated
 	}
 
 	// PRODUCTS
@@ -119,17 +118,17 @@ func main() {
 	// Getter Endpoints.
 	router.Group("retrieve/").Use(middlewares.SetAuthHeaderMiddleware())
 	{
-		router.GET("all/products/:productId", products.GetProductsCatalog)
-		router.GET("product/:productId", products.GetProduct)
+		router.GET("all/products/", products.GetProductsCatalog)
+		router.GET("product/", products.GetProduct)
 	}
 
 	// CUD Endpoints.
 	router.Group("product/").Use(middlewares.SetAuthHeaderMiddleware(),
 		middlewares.JwtAuthenticationMiddleware(), middlewares.IsProductOwnerMiddleware())
 	{ // Is Authenticated
-		router.POST("create/", products.CreateProduct)             // permission for creating products requires.
-		router.PUT("update/:productId", products.UpdateProduct)    // permission for own this product
-		router.DELETE("delete/:productId", products.DeleteProduct) // permissions for own this product.
+		router.POST("create/", products.CreateProduct)   // permission for creating products requires.
+		router.PUT("update/", products.UpdateProduct)    // permission for own this product
+		router.DELETE("delete/", products.DeleteProduct) // permissions for own this product.
 	}
 
 	// Most ... Products.
@@ -137,7 +136,6 @@ func main() {
 	{
 		router.GET("/popular/week/products", products.GetTopWeekProducts) // AllowAny
 	}
-
 	DebugLogger.Println("Running HTTP Server...")
 	http.ListenAndServe(fmt.Sprintf("%s:%s", APPLICATION_HOST, APPLICATION_PORT), Protection(router))
 }

@@ -1,0 +1,33 @@
+// Pipeline for Applied Terraform Configuration in the Google Cloud Platform Project.
+pipeline {
+    agent any 
+    stages {
+        stage("terraform-config-validation") {
+            script {
+                Valid = (sh script: "terraform validate", returnStdout: true).Split(" ")
+                if (Valid[0] != "Success!") {
+                echo "File has some Validation Errors."
+                error "Invalid File."}else{echo "Terraform File Is Valid. Deploying..."}
+            }
+        }
+        stage("terraform-gce-update-deployment") {
+            
+            steps {
+                script {
+                    sh "echo 'Applying Terraform Configuration...'"
+                    Applied = sh script: "terraform apply -auto-approve --no-color", returnStdout: true
+                    if (Applied != "Applied!") {
+                        error "Failed To Apply Terraform Pipeline, Response: $Applied"
+                    }else{
+                        sh "Terraform Pipeline has been execut"
+                    }
+                }
+            }
+        }
+        post {
+            emailtext body: "Terraform Pipeline Has been Finished. Please Review The Results.",
+            recipientProviders: [[$class: "DevelopersRecipientProvider"], [$class: "RequesterRecipientProvider"]],
+            subject: "Google Cloud Terraform Pipeline."
+        }
+    }
+}
