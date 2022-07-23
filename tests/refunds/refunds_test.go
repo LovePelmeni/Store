@@ -3,7 +3,7 @@ package test_refunds
 import (
 	"testing"
 
-	"github.com/LovePelmeni/OnlineStore/StoreService/external_services/payments"
+	"github.com/LovePelmeni/Store/external_services/payments"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"

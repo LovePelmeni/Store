@@ -8,8 +8,8 @@ import (
 
 	"context"
 
-	"github.com/LovePelmeni/OnlineStore/StoreService/external_services/exceptions"
-	grpcControllers "github.com/LovePelmeni/OnlineStore/StoreService/external_services/payments/proto"
+	"github.com/LovePelmeni/Store/external_services/exceptions"
+	grpcControllers "github.com/LovePelmeni/Store/external_services/payments/proto"
 	"github.com/mercari/go-circuitbreaker"
 	"google.golang.org/grpc"
 )

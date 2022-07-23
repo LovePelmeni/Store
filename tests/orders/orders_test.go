@@ -5,7 +5,7 @@ import (
 
 	"errors"
 
-	"github.com/LovePelmeni/OnlineStore/StoreService/external_services/orders"
+	// "github.com/LovePelmeni/OnlineStore/StoreService/external_services/orders"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"

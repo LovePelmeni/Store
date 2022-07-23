@@ -13,8 +13,8 @@ terraform {
 // Google Cloud Credentials.... 
 data "google_prodiver_credentials" "credentials" {
 
-    googleProjectCredentials = ""
-    googleProjectName = ""
+    googleProjectCredentials = "googleCredentials.json"
+    googleProjectName = "google-project-id"
     googleProjectRegionName = "us-central-1" 
 
     googleProjectTimeZone = "us-central"
@@ -24,13 +24,13 @@ data "google_prodiver_credentials" "credentials" {
 }
 
 data "google_container_cluster" "kubernetes_cluster" {
-  name = ""
-  location = ""
+  name = "cluster-name"
+  location = "us-central1"
 }
 
 data "google_default_config" "default" { // contains generated access token for google cloud management,
 //that will be active for specific period of time.
-  access_token = ""
+  access_token = "access-token"
 }
 
 data "terraform_remote_state" "gke" { // Parses google Cloud Project terraform state..
@@ -41,9 +41,9 @@ data "terraform_remote_state" "gke" { // Parses google Cloud Project terraform s
 }
 
 
-data "kubernetes_manager_credentials" {
-  KubernetesUser = "" 
-  KubernetesPassword = ""
+data "kubernetes_manager_credentials" { // Credentials for Managing Cluster
+  KubernetesUser = "kube-cluster-manager"  // username of the cluster role 
+  KubernetesPassword = "kube-cluster-password" // password of the cluster role.
 }
 
 // Providers goes there... 

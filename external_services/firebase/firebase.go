@@ -11,9 +11,7 @@ import (
 
 	firebase "firebase.google.com/go"
 	"firebase.google.com/go/db"
-	"github.com/LovePelmeni/OnlineStore/StoreService/external_services/exceptions"
-
-	// "github.com/LovePelmeni/OnlineStore/StoreService/external_services/orders"
+	"github.com/LovePelmeni/Store/external_services/exceptions"
 	"github.com/mercari/go-circuitbreaker"
 )
 

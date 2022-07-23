@@ -9,9 +9,12 @@ import (
 	"context"
 	"time"
 
-	"github.com/LovePelmeni/OnlineStore/StoreService/external_services/exceptions"
-	paymentClients "github.com/LovePelmeni/OnlineStore/StoreService/external_services/payments/clients"
-	paymentGrpcControllers "github.com/LovePelmeni/OnlineStore/StoreService/external_services/payments/proto"
+	"fmt"
+	"regexp"
+
+	"github.com/LovePelmeni/Store/external_services/exceptions"
+	paymentClients "github.com/LovePelmeni/Store/external_services/payments/clients"
+	paymentGrpcControllers "github.com/LovePelmeni/Store/external_services/payments/proto"
 	"github.com/mercari/go-circuitbreaker"
 	curcuitbreaker "github.com/mercari/go-circuitbreaker"
 )
@@ -44,6 +47,8 @@ func init() {
 
 // Abstractions...
 
+type ProductId string
+
 //go:generate -destination=StoreService/mocks/payments.go --build_flags=--mod=mod . PaymentIntentCredentialsInterface
 
 type PaymentIntentCredentialsInterface interface {
@@ -52,7 +57,7 @@ type PaymentIntentCredentialsInterface interface {
 	// PaymentSessionId string - `Identifier` of the Payment Session, that was returned from the PaymentSessionControllerInterface after Calling `CreatePaymentSession` Method.
 
 	Validate() (PaymentIntentCredentialsInterface, []error)
-	GetCredentials() (*PaymentIntentCredentialsInterface, []error)
+	GetCredentials() (PaymentIntentCredentialsInterface, []error)
 }
 
 //go:generate -destination=StoreService/mocks/payments.go --build_flags=--mod=mod . PaymentSessionCredentialsInterface
@@ -69,15 +74,7 @@ type PaymentSessionCredentialsInterface interface {
 	// 		- Currency string
 	// 		-
 	Validate() (PaymentSessionCredentialsInterface, []error)
-	GetCredentials() (*PaymentSessionCredentialsInterface, []error)
-}
-
-//go:generate -destination=StoreService/mocks/payments.go --build_flags=--mod=mod . PaymentCheckoutStructInterface
-type PaymentCheckoutStructRendererInterface interface {
-	// Payment Checkout Interface, that is responsible for Processing Checkout Content,
-	GetImage(CheckoutContent map[string]string) ([]byte, error)
-	GetJson(CheckoutContent map[string]string) ([]byte, error)
-	GetXml(CheckoutContent map[string]string) ([]byte, error)
+	GetCredentials() (PaymentSessionCredentialsInterface, []error)
 }
 
 //go:generate -destination=StoreService/mocks/payments.go --build_flags=--mod=mod . PaymentRefundCredentialsInterface
@@ -86,7 +83,7 @@ type PaymentRefundCredentialsInterface interface {
 	// Controller Interface, represents Payment Refund Model, Requires Following Params.
 	// - Payment Id of ORM Model Object the Object That Was Created, during Successful Payment.
 	Validate() (PaymentRefundCredentialsInterface, []error)
-	GetCredentials() (*PaymentRefundCredentialsInterface, []error)
+	GetCredentials() (PaymentRefundCredentialsInterface, []error)
 }
 
 // Controllers Interfaces...
@@ -118,23 +115,145 @@ type PaymentRefundControllerInterface interface {
 	CreatePaymentRefund(PaymentRefundCredentials *PaymentRefundCredentialsInterface) (map[string]string, error)
 }
 
-// Implementations..
+// Validators
+
+type PaymentIntentValidator struct {
+	Patterns map[string]string
+}
+
+func NewPaymentIntentValidator() *PaymentIntentValidator {
+	return &PaymentIntentValidator{
+		Patterns: map[string]string{
+
+			"UsernamePattern": "^[a-zA-z]{1,100}$",
+			"EmailPattern":    "",
+			"UserIdPattern":   "^.*[0-9]$",
+
+			"ProductIdPattern":  "^.*[0-9]$",
+			"CurrencyPattern":   "^[A-Z]{3}$",
+			"TotalPricePattern": "^[0-9]{1,5}.{1,5}$",
+		},
+	}
+}
+func (this *PaymentIntentValidator) Validate(PropertyName string, Value string) (bool, []error) {
+	if Valid, Error := regexp.MatchString(
+		this.Patterns[PropertyName+"Pattern"], Value); Valid != true || Error != nil {
+		return false, []errors.New(
+			fmt.Sprintf("Validation Error. Error : %s", Error.Error()))
+	}
+	return true, nil
+}
 
 // Credentials Implementations...
 
 type PaymentIntentCredentials struct {
 	Mutex       sync.RWMutex
 	Credentials struct {
+		Products             []ProductId // basically this is a list of product IDs....
+		PurchaserCredentials struct {
+			UserId   string
+			Username string
+			Email    string
+		}
+		TotalPrice string
+		Currency   string
+		CreatedAt  string
+	}
+	Validator *PaymentIntentValidator
+}
+
+func NewPaymentIntentCredentials(Credentials struct {
+	Products             []ProductId // basically this is a list of product IDs....
+	PurchaserCredentials struct {
+		UserId   string
+		Username string
+		Email    string
+	}
+	TotalPrice string
+	Currency   string
+	CreatedAt  string
+}) *PaymentIntentCredentials {
+
+	Validator := NewPaymentIntentValidator()
+	return &PaymentIntentCredentials{
+		Credentials: Credentials,
+		Validator:   Validator,
 	}
 }
 
-func NewPaymentIntentCredentials(Credentials struct{}) *PaymentIntentCredentials {
-	return &PaymentIntentCredentials{Credentials: Credentials}
+func (this *PaymentIntentCredentials) Validate() (*PaymentIntentCredentials, []error) {
+
+	group := sync.WaitGroup{}
+	var ValidationErrors []error
+
+	// Validates Purchaser Credentials....
+	go func() {
+
+		group.Add(1)
+		this.Mutex.Lock()
+
+		for Property, Value := range map[string]string{
+			"Email":    this.Credentials.PurchaserCredentials.Email,
+			"Username": this.Credentials.PurchaserCredentials.Username,
+			"UserId":   this.Credentials.PurchaserCredentials.UserId} {
+
+			if Valid, ValidationError := this.Validator.Validate(Property,
+				Value); Valid != true || ValidationError != nil {
+				ValidationErrors = append(ValidationErrors, ValidationError[0])
+			}
+
+		}
+		this.Mutex.Unlock()
+		group.Done()
+	}()
+
+	// Validates Products Credentials + Total Price + Currency
+	go func() {
+		group.Add(1)
+		for Property, Value := range map[string]string{
+			"TotalPrice": this.Credentials.TotalPrice,
+			"Currency":   this.Credentials.Currency,
+		} {
+			if Valid, ValidationError := this.Validator.Validate(Property, Value); Valid != true || ValidationError != nil {
+				ValidationErrors = append(
+					ValidationErrors, ValidationError[0])
+			}
+		}
+
+		for _, Value := range this.Credentials.Products {
+			if Valid, ValidationError := this.Validator.Validate("ProductId",
+				string(Value)); ValidationError[0] != nil || !Valid {
+				ValidationErrors = append(ValidationErrors, ValidationError[0])
+			}
+		}
+		group.Done()
+	}()
+	group.Wait()
+	if len(ValidationErrors) != 0 {
+		return nil,
+			ValidationErrors
+	} else {
+		return this, nil
+	}
 }
 
-func (this *PaymentIntentCredentials) Validate() (*PaymentIntentCredentials, []error)
+func (this *PaymentIntentCredentials) GetCredentials() (*PaymentIntentCredentials, []error) {
+	return this.Validate()
+}
 
-func (this *PaymentIntentCredentials) GetCredentials() (*PaymentIntentCredentials, []error)
+// Payment Session Validators
+
+type PaymentSessionValidator struct {
+	Patterns map[string]string
+}
+
+func NewPaymentSessionValidator() *PaymentSessionValidator {
+	return &PaymentSessionValidator{
+		Patterns: map[string]string{
+			"": "",
+		},
+	}
+}
 
 type PaymentSessionCredentials struct {
 	Mutex       sync.RWMutex
@@ -145,10 +264,19 @@ type PaymentSessionCredentials struct {
 		TotalPrice        string
 		Currency          string
 	}
+	Validator *PaymentSessionValidator
 }
 
-func NewPaymentSessionCredentials(Credentials struct{}) *PaymentSessionCredentials {
-	return &PaymentSessionCredentials{Credentials: Credentials}
+func NewPaymentSessionCredentials(Credentials struct {
+	ProductId         string
+	PurchaserId       string
+	PurchaserUsername string
+	TotalPrice        string
+	Currency          string
+}) *PaymentSessionCredentials {
+	Validator := NewPaymentSessionValidator()
+	return &PaymentSessionCredentials{Credentials: Credentials,
+		Validator: Validator}
 }
 
 func (this *PaymentSessionCredentials) Validate() (PaymentSessionCredentials, []error)
@@ -162,7 +290,7 @@ type PaymentRefundCredentials struct {
 	}
 }
 
-func NewPaymentRefundCredentials(Credentials struct{}) *PaymentRefundCredentials {
+func NewPaymentRefundCredentials(Credentials struct{ PaymentId string }) *PaymentRefundCredentials {
 	return &PaymentRefundCredentials{Credentials: Credentials}
 }
 
@@ -199,14 +327,14 @@ func NewPaymentIntentController(Client *paymentClients.PaymentIntentClientInterf
 		)}
 }
 
-func (this *PaymentIntentController) CreatePaymentIntent(Credentials *PaymentIntentCredentials) (struct{ PaymentIntentId string }, []error) {
+func (this *PaymentIntentController) CreatePaymentIntent(Credentials PaymentIntentCredentialsInterface) (struct{ PaymentIntentId string }, []error) {
 
 	if !this.CircuitBreaker.Ready() {
 		return struct{ PaymentIntentId string }{}, []error{exceptions.ServiceUnavailable()}
 	}
 
 	PaymentGrpcClient, grpcError := this.Client.GetClient()
-	paymentCredentials, ValidationErrors := Credentials.Validate()
+	paymentCredentials, ValidationErrors := Credentials.GetCredentials()
 
 	if errors.Is(grpcError, exceptions.ServiceUnavailable()) {
 		return struct{ PaymentIntentId string }{}, []error{grpcError}
@@ -229,10 +357,10 @@ func (this *PaymentIntentController) CreatePaymentIntent(Credentials *PaymentInt
 			PaymentResponse, Error := PaymentGrpcClient.CreatePaymentIntent(
 				RequestContext,
 				&paymentGrpcControllers.PaymentIntentParams{
-					ProductId:   paymentCredentials.Credentials.ProductId,
-					PurchaserId: paymentCredentials.Credentials.PurchaserId,
+					Products:    paymentCredentials.Credentials.Products,
+					PurchaserId: paymentCredentials.Credentials.PurchaserCredentials.UserId,
 					Currency:    paymentCredentials.Credentials.Currency,
-					Price:       paymentCredentials.TotalPrice,
+					Price:       paymentCredentials.Credentials.TotalPrice,
 				},
 			)
 
@@ -290,7 +418,7 @@ func NewPaymentSessionController(Client *paymentClients.PaymentSessionClientInte
 	}
 }
 
-func (this *PaymentSessionController) CreatePaymentSession(Credentials *PaymentSessionCredentials) (struct{ PaymentSessionId string }, []error) {
+func (this *PaymentSessionController) CreatePaymentSession(Credentials PaymentSessionCredentialsInterface) (struct{ PaymentSessionId string }, []error) {
 
 	if !this.CircuitBreaker.Ready() {
 		return struct{ PaymentSessionId string }{},
@@ -302,7 +430,7 @@ func (this *PaymentSessionController) CreatePaymentSession(Credentials *PaymentS
 		return struct{ PaymentSessionId string }{}, []error{grpcError}
 	}
 
-	credentials, ValidationError := Credentials.Validate()
+	credentials, ValidationError := Credentials.GetCredentials()
 
 	if ValidationError != nil {
 		return struct{ PaymentSessionId string }{}, ValidationError
@@ -315,8 +443,8 @@ func (this *PaymentSessionController) CreatePaymentSession(Credentials *PaymentS
 		func() (interface{}, error) {
 
 			paymentSessionCredentials := paymentGrpcControllers.PaymentSessionParams{
-				ProductId:   credentials.ProductId,
-				PurchaserId: credentials.PurchaserId,
+				ProductId:   credentials.Credentials.ProductId,
+				PurchaserId: credentials.Credentials.PurchaserId,
 			}
 
 			context, CancelError := context.WithTimeout(context.Background(), time.Second*10)
@@ -378,8 +506,8 @@ func (this *PaymentRefundController) CreateRefundIntent(
 	_, Error := this.CircuitBreaker.Do(context.Background(), func() (interface{}, error) {
 
 		refundParams := paymentGrpcControllers.RefundParams{
-			PaymentId:   RefundParams.PaymentId,
-			PurchaserId: Credentials.PurchaserId,
+			PaymentId:   RefundParams.Credentials.PaymentId,
+			PurchaserId: RefundParams.Credentials.PurchaserId,
 		}
 
 		reqContext, CancelError := context.WithTimeout(context.Background(), time.Second*10)

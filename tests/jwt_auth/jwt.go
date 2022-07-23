@@ -3,7 +3,7 @@ package test_jwt
 import (
 	"testing"
 
-	"github.com/LovePelmeni/OnlineStore/StoreService/authentication"
+	// "github.com/LovePelmeni/OnlineStore/StoreService/authentication"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 )

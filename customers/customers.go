@@ -10,8 +10,8 @@ import (
 
 	"sync"
 
-	"github.com/LovePelmeni/OnlineStore/StoreService/authentication"
-	models "github.com/LovePelmeni/OnlineStore/StoreService/models"
+	"github.com/LovePelmeni/Store/authentication"
+	models "github.com/LovePelmeni/Store/models"
 	"github.com/gin-gonic/gin"
 )
 

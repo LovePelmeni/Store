@@ -7,8 +7,8 @@ import (
 
 	"reflect"
 
-	"github.com/LovePelmeni/OnlineStore/StoreService/external_services/payments"
-	grpcControllers "github.com/LovePelmeni/OnlineStore/StoreService/external_services/payments/proto"
+	"github.com/LovePelmeni/Store/external_services/payments"
+	grpcControllers "github.com/LovePelmeni/Store/external_services/payments/proto"
 
 	// mock_intent "github.com/LovePelmeni/OnlineStore/StoreService/mocks/intent"
 	// mock_session "github.com/LovePelmeni/OnlineStore/StoreService/mocks/session"

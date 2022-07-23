@@ -7,11 +7,12 @@ import (
 
 	"log"
 
-	"github.com/LovePelmeni/OnlineStore/StoreService/customers"
-	"github.com/LovePelmeni/OnlineStore/StoreService/middlewares"
+	"github.com/LovePelmeni/Store/customers"
+	"github.com/LovePelmeni/Store/middlewares"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 
-	"github.com/LovePelmeni/OnlineStore/StoreService/models"
-	"github.com/LovePelmeni/OnlineStore/StoreService/products"
+	"github.com/LovePelmeni/Store/models"
+	"github.com/LovePelmeni/Store/products"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -101,25 +102,26 @@ func main() {
 	// 	},
 	// }))
 
-	// CSRF Goes there.
-
-	// Protection := csrf.Protect([]byte(os.Getenv("CSRF_TOKEN_SECRET_KEY")))
-
+	
 	// HEALTHCHECK
 
-	router.GET("/healthcheck/", func(context *gin.Context) {
+	router.GET("/ping", func(context *gin.Context) {
 		context.JSON(http.StatusOK, nil)
 	})
 
-	router.POST("create/customer/", customers.CreateCustomerRestController) // AllowAny
+	// Prometheus metrics... 
 
-	// CUSTOMERS
+	http.Handle("/metrics", promhttp.Handler())
+
+	router.Group("customer/")
+	{
+	router.POST("create/", customers.CreateCustomerRestController) // AllowAny
 	router.Use(middlewares.JwtAuthenticationMiddleware())
 	{
 		router.GET("get/profile/", customers.GetCustomerProfileRestController)    // Is Authenticated   // AllowAny
-		router.PUT("update/customer/", customers.UpdateCustomerRestController)    // Is Authenticated
-		router.DELETE("delete/customer/", customers.DeleteCustomerRestController) // Is Authenticated
-	}
+		router.PUT("update/", customers.UpdateCustomerRestController)    // Is Authenticated
+		router.DELETE("delete/", customers.DeleteCustomerRestController) // Is Authenticated
+	}}
 
 	// PRODUCTS
 

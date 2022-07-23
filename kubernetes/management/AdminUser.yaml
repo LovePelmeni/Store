@@ -1,7 +1,17 @@
 # Set up of the Role for the Application Access Management.
 
+apiVersion: rbac.authorization.k5s.io/v1beta1  # account for managing Permissions at this Namespace.
+kind: ServiceAccount 
+metadata:
+  name: service-account-user 
+  namespace: store-namespace 
+  resourceVersion: "2120"
+
+--- 
+
+
 apiVersion: rbac.authorization.k8s.io/v1beta1  
-kind: Role 
+kind: ClusterRole 
 metadata:
   namespace: store-namespace 
   name: store-application-server-role
@@ -12,7 +22,7 @@ metadata:
 --- 
 
 apiVersion: rbac.authorization.k8s.io/v1beta1 
-kind: RoleBinding 
+kind: ClusterRoleBinding 
 metadata:
   namespace: store-namespace  
 subjects:

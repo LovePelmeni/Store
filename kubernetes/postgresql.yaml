@@ -97,7 +97,7 @@ spec:
           
           command: ["-p", "5435"]
 
-          imagePullPolicy: Never 
+          imagePullPolicy: IfNotPresent 
 
           volumeMounts:
             - mountPath: var/lib/postgres/data

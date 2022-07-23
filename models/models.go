@@ -11,7 +11,7 @@ import (
 
 	"time"
 
-	"github.com/LovePelmeni/OnlineStore/StoreService/exceptions"
+	"github.com/LovePelmeni/Store/exceptions"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )

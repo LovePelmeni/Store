@@ -14,10 +14,10 @@ import (
 
 	"context"
 
-	"github.com/LovePelmeni/OnlineStore/StoreService/external_services/exceptions"
-	"github.com/LovePelmeni/OnlineStore/StoreService/external_services/firebase"
-	"github.com/LovePelmeni/OnlineStore/StoreService/models"
-	circuitbreaker "github.com/mercari/go-circuitbreaker"
+	"github.com/LovePelmeni/Store/external_services/exceptions"
+	"github.com/LovePelmeni/Store/external_services/firebase"
+	"github.com/LovePelmeni/Store/models"
+	"github.com/mercari/go-circuitbreaker"
 )
 
 var (

@@ -7,7 +7,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/LovePelmeni/OnlineStore/StoreService/models"
+	"github.com/LovePelmeni/Store/models"
 	jwt "github.com/dgrijalva/jwt-go"
 )
 

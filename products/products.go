@@ -16,8 +16,8 @@ import (
 
 	"time"
 
-	"github.com/LovePelmeni/OnlineStore/StoreService/authentication"
-	"github.com/LovePelmeni/OnlineStore/StoreService/models"
+	"github.com/LovePelmeni/Store/authentication"
+	"github.com/LovePelmeni/Store/models"
 	"github.com/gin-gonic/gin"
 )
 
@@ -31,6 +31,7 @@ var (
 var product models.Product
 var products []models.Product
 var customer models.Customer
+
 var ProductValidator = models.NewProductModelValidator()
 
 type CustomerBalance string
@@ -177,10 +178,6 @@ func GetProductsCatalog(context *gin.Context) {
 	// after that defering response
 
 	// Method that returns Eventual HTTP Response to the Client...
-	defer func(products []byte) {
-		context.JSON(http.StatusOK, gin.H{"products": products})
-	}(serializedProducts)
-
 	select {
 	case <-ResponseChannel:
 
@@ -205,10 +202,17 @@ func GetProductsCatalog(context *gin.Context) {
 			}()
 			group.Wait()
 			serializedProducts, _ = json.Marshal(products)
+		} else {
+			serializedProducts, _ = json.Marshal(products)
 		}
+
 	default:
 		serializedProducts, _ = json.Marshal(products)
 	}
+	defer func(products []byte) {
+		context.JSON(http.StatusOK, gin.H{"products": products})
+	}(serializedProducts)
+
 	defer close(ResponseChannel) // Closing Channel
 }
 

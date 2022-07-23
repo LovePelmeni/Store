@@ -4,7 +4,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/LovePelmeni/OnlineStore/StoreService/exceptions"
+	"github.com/LovePelmeni/Store/exceptions"
 	"github.com/mercari/go-circuitbreaker"
 )
 

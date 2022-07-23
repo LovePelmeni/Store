@@ -19,3 +19,7 @@ func ServiceUnavailable() error {
 func ValidationError() error {
 	return errors.New("Validation Error.")
 }
+
+func FirebaseDatabaseFailure() error {
+	return errors.New("Database Operation Failure")
+}

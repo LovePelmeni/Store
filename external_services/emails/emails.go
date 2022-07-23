@@ -10,7 +10,7 @@ import (
 	"fmt"
 
 	"github.com/LovePelmeni/EmailService/emails/proto/grpcControllers"
-	"github.com/LovePelmeni/OnlineStore/StoreService/external_services/exceptions"
+	"github.com/LovePelmeni/Store/external_services/exceptions"
 	"github.com/mercari/go-circuitbreaker"
 	"google.golang.org/grpc"
 )
